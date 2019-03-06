@@ -32,3 +32,5 @@ rpmbuild
 .pytest_cache
 venv
 .venv
+archive.tar
+tmp
