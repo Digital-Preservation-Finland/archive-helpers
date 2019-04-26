@@ -33,7 +33,7 @@ find %{_sourcedir}
 %build
 
 %install
-make install PREFIX="%{_prefix}" ROOT="%{buildroot}"
+make install PREFIX="%{_prefix}" DESTDIR="%{buildroot}"
 
 %post
 
