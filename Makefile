@@ -13,7 +13,7 @@ test:
 	py.test  tests -svvvv --junitprefix=archives-helper --junitxml=junit.xml
 
 coverage:
-	py.test tests --cov=upload_rest_api --cov-report=html
+	py.test tests --cov=archive_helpers --cov-report=html
 	coverage report -m
 	coverage html
 	coverage xml
