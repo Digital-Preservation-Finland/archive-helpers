@@ -7,10 +7,14 @@ install:
 	rm -f INSTALLED_FILES
 
 	# Use Python setuptools
-	python ./setup.py install -O1 --prefix="${PREFIX}" --root="${DESTDIR}" --record=INSTALLED_FILES
+	python ./setup.py install -O1 \
+	    --prefix="${PREFIX}" \
+	    --root="${DESTDIR}" \
+	    --record=INSTALLED_FILES
 
 test:
-	py.test  tests -svvvv --junitprefix=archives-helper --junitxml=junit.xml
+	py.test  tests -svvvv -m "not gluster" \
+	    --junitprefix=archives-helper --junitxml=junit.xml
 
 coverage:
 	py.test tests --cov=archive_helpers --cov-report=html

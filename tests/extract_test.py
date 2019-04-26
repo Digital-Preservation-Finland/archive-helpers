@@ -108,6 +108,7 @@ def test_cat_tar_extract(filename, tmpdir):
 
 
 @pytest.mark.sudo
+@pytest.mark.gluster
 @pytest.mark.usefixtures("glusterfs_fx")
 @pytest.mark.parametrize("filename", _TAR_NAMES.keys())
 def test_gfcat_tar_extract(filename, tmpdir):
