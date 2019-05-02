@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import tarfile
 
 
 def path_to_glfs(source_path, mount_path, glusterfs_host):
@@ -46,7 +47,7 @@ def _tar(args, destination_path, **kwargs):
 
     """
     tar = _popen(
-        ["tar", "x", "-C", destination_path] + args,
+        ["tar", "x", "-C", "."] + args,
         cwd=destination_path, **kwargs)
     if "stdin" in kwargs:
         kwargs["stdin"].close()
@@ -109,3 +110,47 @@ def zip_extract(source_path, destination_path):
     """
     unzip = _popen(["unzip", source_path], cwd=destination_path)
     unzip.communicate()
+
+
+class ExtractError(Exception):
+    """Exception raised when tar or zip files contain bad members."""
+    pass
+
+
+def _check_tar_members(tarf, extract_path):
+    """Check that all files are extracted under extract_path,
+    archive contains only regular files and directories, and extracting the
+    archive does not overwrite anything.
+    """
+    extract_path = os.path.abspath(extract_path)
+
+    for member in tarf:
+        fpath = os.path.abspath(os.path.join(extract_path, member.name))
+
+        if not fpath.startswith(extract_path):
+            raise ExtractError(
+                "Invalid file path: '%s'" % member.name
+            )
+        elif not member.isfile() and not member.isdir():
+            raise ExtractError(
+                "File '%s' has unsupported type: %s" % (member.name, member.type)
+            )
+        elif os.path.isfile(fpath):
+            raise ExtractError(
+                "File '%s' already exists" % member.name
+            )
+
+
+def tarfile_extract(tar_path, extract_path):
+    """Decompress using tarfile module. Extract
+
+    :param tar_path: Path to the tar archive
+    :param extract_path: Directory where the archive is extracted
+    :returns: None
+    """
+    if not tarfile.is_tarfile(tar_path):
+        raise tarfile.TarError("%s is not a tar archive" % tar_path)
+
+    with tarfile.open(tar_path) as tarf:
+        _check_tar_members(tarf, extract_path)
+        tarf.extractall(extract_path)

@@ -10,7 +10,7 @@ def main():
         name='archive-helpers',
         packages=find_packages(exclude=['tests', 'tests.*']),
         version=get_version(),
-        install_requires=[],
+        install_requires=["click"],
     )
 
 if __name__ == '__main__':
