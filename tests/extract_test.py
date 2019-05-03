@@ -20,12 +20,7 @@ TAR_FILES = [
     ("source.tar.bz2", "j")
 ]
 
-ARCHIVES = [
-    ("source.tar", ""),
-    ("source.tar.gz", "z"),
-    ("source.tar.bz2", "j"),
-    ("source.zip", "")
-]
+ARCHIVES = TAR_FILES + [("source.zip", "")]
 
 
 def _tar(tmpdir, fname, dir_to_tar, compression=""):
