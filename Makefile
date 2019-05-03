@@ -13,7 +13,7 @@ install:
 	    --record=INSTALLED_FILES
 
 test:
-	py.test  tests -svvvv -m "not gluster" \
+	py.test  tests -v -m "not gluster" \
 	    --junitprefix=archives-helper --junitxml=junit.xml
 
 coverage:

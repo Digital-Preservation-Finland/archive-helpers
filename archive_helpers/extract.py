@@ -189,7 +189,7 @@ def _check_zip_members(zipf, extract_path):
 
     for member in zipf:
         fpath = os.path.abspath(os.path.join(extract_path, member.filename))
-        mode = member.external_attr >> 16L # Upper two bytes of ext attributes
+        mode = member.external_attr >> 16 # Upper two bytes of ext attributes
 
         if not fpath.startswith(extract_path):
             raise ExtractError(

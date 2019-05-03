@@ -229,15 +229,29 @@ def test_extract_relative_paths(path, tmpdir):
         assert str(error.value) == "Invalid file path: '%s'" % path
 
 
-def test_extract_absolute_path(tmpdir):
+def _tar_absolute_path(tmpdir, fname, compression=""):
+    """Create tar archives with absolute paths"""
+    archive = str(tmpdir.join(fname))
+    command = [
+        "tar", "-c%sf" % compression, archive, "source/file1",
+        "--transform", "s|source/file1|/file1|"
+    ]
+    subprocess.call(command, cwd=str(tmpdir))
+
+
+@pytest.mark.parametrize("archive", TAR_FILES)
+def test_extract_absolute_path(archive, tmpdir):
     """Test that trying to extract files with absolute paths raises ExtractError
     """
+    fname, compression = archive
+    _tar_absolute_path(tmpdir, fname, compression)
+
     with pytest.raises(ExtractError) as error:
         extract(
-            "tests/data/absolute_path.tar", str(tmpdir.join("destination"))
+            str(tmpdir.join(fname)), str(tmpdir.join("destination"))
         )
 
-    assert str(error.value) == "Invalid file path: '/etc/passwd2'"
+    assert str(error.value) == "Invalid file path: '/file1'"
 
 
 @pytest.mark.parametrize("archive", ARCHIVES)
