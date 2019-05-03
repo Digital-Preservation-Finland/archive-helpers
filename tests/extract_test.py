@@ -10,7 +10,7 @@ import pytest
 
 from archive_helpers.extract import (
     path_to_glfs, cat_tar_extract, tar_extract, zip_extract,
-    tarfile_extract, ExtractError
+    extract, ExtractError
 )
 
 
@@ -18,6 +18,13 @@ TAR_FILES = [
     ("source.tar", ""),
     ("source.tar.gz", "z"),
     ("source.tar.bz2", "j")
+]
+
+ARCHIVES = [
+    ("source.tar", ""),
+    ("source.tar.gz", "z"),
+    ("source.tar.bz2", "j"),
+    ("source.zip", "")
 ]
 
 
@@ -32,7 +39,7 @@ def _tar(tmpdir, fname, dir_to_tar, compression=""):
 def _zip(tmpdir, dir_to_zip):
     """Compress compress_dir to zip file"""
     subprocess.call(
-        ["zip", "-r", "source.zip", dir_to_zip], cwd=str(tmpdir)
+        ["zip", "-r", "source.zip", dir_to_zip, "--symlinks"], cwd=str(tmpdir)
     )
 
 
@@ -93,10 +100,10 @@ def glusterfs_fx(tmpdir):
          str(tmpdir.join("glusterfs"))])
 
 
-@pytest.mark.parametrize("filename", TAR_FILES)
-def test_tar_extract(filename, tmpdir):
+@pytest.mark.parametrize("archive", TAR_FILES)
+def test_tar_extract(archive, tmpdir):
     """Test the tar extract functionality"""
-    fname, compression = filename
+    fname, compression = archive
     _tar(tmpdir, fname, "source", compression)
 
     tar_extract(
@@ -106,10 +113,10 @@ def test_tar_extract(filename, tmpdir):
     assert tmpdir.join("destination/source/file1").check()
 
 
-@pytest.mark.parametrize("filename", TAR_FILES)
-def test_cat_tar_extract(filename, tmpdir):
+@pytest.mark.parametrize("archive", TAR_FILES)
+def test_cat_tar_extract(archive, tmpdir):
     """Test the tar extract functionality"""
-    fname, compression = filename
+    fname, compression = archive
     _tar(tmpdir, fname, "source", compression)
 
     cat_tar_extract(
@@ -123,10 +130,10 @@ def test_cat_tar_extract(filename, tmpdir):
 @pytest.mark.sudo
 @pytest.mark.gluster
 @pytest.mark.usefixtures("glusterfs_fx")
-@pytest.mark.parametrize("filename", TAR_FILES)
-def test_gfcat_tar_extract(filename, tmpdir):
+@pytest.mark.parametrize("archive", TAR_FILES)
+def test_gfcat_tar_extract(archive, tmpdir):
     """Test the tar extract functionality"""
-    fname, _ = filename
+    fname, _ = archive
 
     source_path = path_to_glfs(
         source_path=str(tmpdir.join("glfs_test/{}".format(fname))),
@@ -151,28 +158,44 @@ def test_zip_extract(tmpdir):
     assert tmpdir.join("destination/source/file1").check()
 
 
-@pytest.mark.parametrize("filename", TAR_FILES)
-def test_tarfile_extract_symlink(filename, tmpdir):
+def test_extract_regular_file(tmpdir):
+    """Test that trying to extract a regular file raises ExtractError"""
+    with pytest.raises(ExtractError) as error:
+        extract(
+            str(tmpdir.join("source/file1")), str(tmpdir.join("destination"))
+        )
+
+    assert str(error.value).endswith("is not supported")
+
+
+@pytest.mark.parametrize("archive", ARCHIVES)
+def test_extract_symlink(archive, tmpdir):
     """Test that trying to extract a symlink raises ExtractError"""
-    fname, compression = filename
-    _tar(tmpdir, fname, "symlink", compression)
+    fname, compression = archive
+    if fname.endswith(".zip"):
+        _zip(tmpdir, "symlink")
+    else:
+        _tar(tmpdir, fname, "symlink", compression)
 
     with pytest.raises(ExtractError) as error:
-        tarfile_extract(
+        extract(
             str(tmpdir.join(fname)), str(tmpdir.join("destination"))
         )
 
-    assert str(error.value) == "File 'symlink/link' has unsupported type: 2"
+    assert str(error.value) == "File 'symlink/link' has unsupported type: SYM"
 
 
-@pytest.mark.parametrize("filename", TAR_FILES)
-def test_tarfile_overwrite(filename, tmpdir):
+@pytest.mark.parametrize("archive", ARCHIVES)
+def test_extract_overwrite(archive, tmpdir):
     """Test that trying to overwrite files raises ExtractError"""
-    fname, compression = filename
-    _tar(tmpdir, fname, "source", compression)
+    fname, compression = archive
+    if fname.endswith(".zip"):
+        _zip(tmpdir, "source")
+    else:
+        _tar(tmpdir, fname, "source", compression)
 
     with pytest.raises(ExtractError) as error:
-        tarfile_extract(
+        extract(
             str(tmpdir.join(fname)), str(tmpdir)
         )
 
@@ -185,7 +208,7 @@ def test_tarfile_overwrite(filename, tmpdir):
     ("./valid", True),
     ("../destination/valid", True)
 ])
-def test_tarfile_relative_paths(path, tmpdir):
+def test_extract_relative_paths(path, tmpdir):
     """Test that trying to write files outside the workspace raises
     ExtractError
     """
@@ -195,23 +218,41 @@ def test_tarfile_relative_paths(path, tmpdir):
         tarf.add(str(tmpdir.join("source/file1")), arcname=path)
 
     if valid_path:
-        tarfile_extract(
+        extract(
             str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
         )
     else:
         with pytest.raises(ExtractError) as error:
-            tarfile_extract(
+            extract(
                 str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
             )
         assert str(error.value) == "Invalid file path: '%s'" % path
 
 
-def test_tarfile_absolut_path(tmpdir):
-    """Test that trying to extract files with absolut paths raises ExtractError
+def test_extract_absolute_path(tmpdir):
+    """Test that trying to extract files with absolute paths raises ExtractError
     """
     with pytest.raises(ExtractError) as error:
-        tarfile_extract(
-            "tests/data/absolut_path.tar", str(tmpdir.join("destination"))
+        extract(
+            "tests/data/absolute_path.tar", str(tmpdir.join("destination"))
         )
 
     assert str(error.value) == "Invalid file path: '/etc/passwd2'"
+
+
+@pytest.mark.parametrize("archive", ARCHIVES)
+def test_extract_success(archive, tmpdir):
+    """Test that tar and zip archives are correctly extracted."""
+    fname, compression = archive
+    if fname.endswith(".zip"):
+        _zip(tmpdir, "source")
+    else:
+        _tar(tmpdir, fname, "source", compression)
+
+    extract(
+        str(tmpdir.join(fname)), str(tmpdir.join("destination"))
+    )
+
+    assert len(tmpdir.join("destination").listdir()) == 1
+    assert len(tmpdir.join("destination/source").listdir()) == 1
+    assert tmpdir.join("destination/source/file1").check()
