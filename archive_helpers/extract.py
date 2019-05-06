@@ -141,30 +141,6 @@ class ExtractError(Exception):
     pass
 
 
-def _check_tar_members(tarf, extract_path):
-    """Check that all files are extracted under extract_path,
-    archive contains only regular files and directories, and extracting the
-    archive does not overwrite anything.
-    """
-    extract_path = os.path.abspath(extract_path)
-
-    for member in tarf:
-        fpath = os.path.abspath(os.path.join(extract_path, member.name))
-
-        if not fpath.startswith(extract_path):
-            raise ExtractError(
-                "Invalid file path: '%s'" % member.name
-            )
-        elif not member.isfile() and not member.isdir():
-            raise ExtractError("File '%s' has unsupported type: %s" % (
-                member.name, TAR_FILE_TYPES[member.type]
-            ))
-        elif os.path.isfile(fpath):
-            raise ExtractError(
-                "File '%s' already exists" % member.name
-            )
-
-
 def tarfile_extract(tar_path, extract_path):
     """Decompress using tarfile module.
 
@@ -176,32 +152,46 @@ def tarfile_extract(tar_path, extract_path):
         raise ExtractError("File '%s' is not a tar archive" % tar_path)
 
     with tarfile.open(tar_path) as tarf:
-        _check_tar_members(tarf, extract_path)
+        _check_archive_members(tarf, extract_path)
         tarf.extractall(extract_path)
 
 
-def _check_zip_members(zipf, extract_path):
+def _check_archive_members(archive, extract_path):
     """Check that all files are extracted under extract_path,
     archive contains only regular files and directories, and extracting the
     archive does not overwrite anything.
+
+    :param archive: Opened ZipFile or TarFile
+    :returns: None
     """
+    is_tar = isinstance(archive, tarfile.TarFile)
     extract_path = os.path.abspath(extract_path)
 
-    for member in zipf:
-        fpath = os.path.abspath(os.path.join(extract_path, member.filename))
-        mode = member.external_attr >> 16 # Upper two bytes of ext attributes
+    for member in archive:
+        filename = member.name if is_tar else member.filename
+        fpath = os.path.abspath(os.path.join(extract_path, filename))
 
+        # Check the filetype
+        if not is_tar:
+            mode = member.external_attr >> 16 # Upper two bytes of ext attr
+            supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+            filetype = FILETYPES[stat.S_IFMT(mode)]
+        else:
+            supported_type = member.isfile() or member.isdir()
+            filetype = TAR_FILE_TYPES[member.type]
+
+        # Check if the archive member is valid
         if not fpath.startswith(extract_path):
             raise ExtractError(
-                "Invalid file path: '%s'" % member.filename
+                "Invalid file path: '%s'" % filename
             )
-        elif not stat.S_ISDIR(mode) and not stat.S_ISREG(mode):
+        elif not supported_type:
             raise ExtractError("File '%s' has unsupported type: %s" % (
-                member.filename, FILETYPES[stat.S_IFMT(mode)]
+                filename, filetype
             ))
         elif os.path.isfile(fpath):
             raise ExtractError(
-                "File '%s' already exists" % member.filename
+                "File '%s' already exists" % filename
             )
 
 
@@ -216,7 +206,7 @@ def zipfile_extract(zip_path, extract_path):
         raise ExtractError("File '%s' is not a zip archive" % zip_path)
 
     with zipfile.ZipFile(zip_path) as zipf:
-        _check_zip_members(zipf.infolist(), extract_path)
+        _check_archive_members(zipf.infolist(), extract_path)
         zipf.extractall(extract_path)
 
 
