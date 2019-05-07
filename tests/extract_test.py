@@ -9,8 +9,10 @@ import tarfile
 import pytest
 
 from archive_helpers.extract import (
-    path_to_glfs, cat_tar_extract, tar_extract, zip_extract,
-    extract, ExtractError
+    path_to_glfs, cat_tar_extract, tar_extract, zip_extract, extract
+)
+from archive_helpers.extract import (
+    ExtractError, MemberNameError, MemberTypeError, MemberOverwriteError
 )
 
 
@@ -165,14 +167,14 @@ def test_extract_regular_file(tmpdir):
 
 @pytest.mark.parametrize("archive", ARCHIVES)
 def test_extract_symlink(archive, tmpdir):
-    """Test that trying to extract a symlink raises ExtractError"""
+    """Test that trying to extract a symlink raises MemberTypeError"""
     fname, compression = archive
     if fname.endswith(".zip"):
         _zip(tmpdir, "symlink")
     else:
         _tar(tmpdir, fname, "symlink", compression)
 
-    with pytest.raises(ExtractError) as error:
+    with pytest.raises(MemberTypeError) as error:
         extract(
             str(tmpdir.join(fname)), str(tmpdir.join("destination"))
         )
@@ -182,14 +184,14 @@ def test_extract_symlink(archive, tmpdir):
 
 @pytest.mark.parametrize("archive", ARCHIVES)
 def test_extract_overwrite(archive, tmpdir):
-    """Test that trying to overwrite files raises ExtractError"""
+    """Test that trying to overwrite files raises MemberOverwriteError"""
     fname, compression = archive
     if fname.endswith(".zip"):
         _zip(tmpdir, "source")
     else:
         _tar(tmpdir, fname, "source", compression)
 
-    with pytest.raises(ExtractError) as error:
+    with pytest.raises(MemberOverwriteError) as error:
         extract(
             str(tmpdir.join(fname)), str(tmpdir)
         )
@@ -205,7 +207,7 @@ def test_extract_overwrite(archive, tmpdir):
 ])
 def test_extract_relative_paths(path, tmpdir):
     """Test that trying to write files outside the workspace raises
-    ExtractError
+    MemberNameError
     """
     path, valid_path = path
 
@@ -217,7 +219,7 @@ def test_extract_relative_paths(path, tmpdir):
             str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
         )
     else:
-        with pytest.raises(ExtractError) as error:
+        with pytest.raises(MemberNameError) as error:
             extract(
                 str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
             )
@@ -236,12 +238,13 @@ def _tar_absolute_path(tmpdir, fname, compression=""):
 
 @pytest.mark.parametrize("archive", TAR_FILES)
 def test_extract_absolute_path(archive, tmpdir):
-    """Test that trying to extract files with absolute paths raises ExtractError
+    """Test that trying to extract files with absolute paths raises
+    MemberNameError.
     """
     fname, compression = archive
     _tar_absolute_path(tmpdir, fname, compression)
 
-    with pytest.raises(ExtractError) as error:
+    with pytest.raises(MemberNameError) as error:
         extract(
             str(tmpdir.join(fname)), str(tmpdir.join("destination"))
         )

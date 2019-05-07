@@ -137,7 +137,28 @@ def zip_extract(source_path, destination_path):
 
 
 class ExtractError(Exception):
-    """Exception raised when tar or zip files contain bad members."""
+    """Generic archive extraction error raised when the archive is not
+    supported.
+    """
+    pass
+
+
+class MemberNameError(Exception):
+    """Exception raised when tar or zip files contain members with names
+    pointing outside the extraction path.
+    """
+    pass
+
+
+class MemberTypeError(Exception):
+    """Exception raised when tar or zip files contain members with filetype
+    other than REG or DIR.
+    """
+    pass
+
+
+class MemberOverwriteError(Exception):
+    """Exception raised when extracting the archive would overwrite files."""
     pass
 
 
@@ -182,15 +203,15 @@ def _check_archive_members(archive, extract_path):
 
         # Check if the archive member is valid
         if not fpath.startswith(extract_path):
-            raise ExtractError(
+            raise MemberNameError(
                 "Invalid file path: '%s'" % filename
             )
         elif not supported_type:
-            raise ExtractError("File '%s' has unsupported type: %s" % (
+            raise MemberTypeError("File '%s' has unsupported type: %s" % (
                 filename, filetype
             ))
         elif os.path.isfile(fpath):
-            raise ExtractError(
+            raise MemberOverwriteError(
                 "File '%s' already exists" % filename
             )
 
