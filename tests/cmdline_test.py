@@ -36,6 +36,7 @@ def test_decompress_cat(cli_fx):
     assert patch_tar_fx.kwargs == {'cat': 'cat'}
 
 
+@pytest.mark.gluster
 def test_decompress_gfcat(cli_fx):
     """Test decompression"""
 

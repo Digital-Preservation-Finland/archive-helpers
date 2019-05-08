@@ -1,7 +1,32 @@
 """Extract/decompress various archive formats"""
 
 import os
+import stat
 import subprocess
+import tarfile
+import zipfile
+
+
+FILETYPES = {
+    0o010000: "FIFO",
+    0o020000: "CHR",
+    0o040000: "DIR",
+    0o060000: "BLK",
+    0o100000: "REG",
+    0o120000: "SYM",
+    0o140000: "SOCK"
+}
+
+TAR_FILE_TYPES = {
+    "0": "REG",
+    "1": "LNK",
+    "2": "SYM",
+    "3": "CHR",
+    "4": "BLK",
+    "5": "DIR",
+    "6": "FIFO",
+    "7": "CONT"
+}
 
 
 def path_to_glfs(source_path, mount_path, glusterfs_host):
@@ -46,7 +71,7 @@ def _tar(args, destination_path, **kwargs):
 
     """
     tar = _popen(
-        ["tar", "x", "-C", destination_path] + args,
+        ["tar", "x", "-C", "."] + args,
         cwd=destination_path, **kwargs)
     if "stdin" in kwargs:
         kwargs["stdin"].close()
@@ -109,3 +134,113 @@ def zip_extract(source_path, destination_path):
     """
     unzip = _popen(["unzip", source_path], cwd=destination_path)
     unzip.communicate()
+
+
+class ExtractError(Exception):
+    """Generic archive extraction error raised when the archive is not
+    supported.
+    """
+    pass
+
+
+class MemberNameError(Exception):
+    """Exception raised when tar or zip files contain members with names
+    pointing outside the extraction path.
+    """
+    pass
+
+
+class MemberTypeError(Exception):
+    """Exception raised when tar or zip files contain members with filetype
+    other than REG or DIR.
+    """
+    pass
+
+
+class MemberOverwriteError(Exception):
+    """Exception raised when extracting the archive would overwrite files."""
+    pass
+
+
+def tarfile_extract(tar_path, extract_path):
+    """Decompress using tarfile module.
+
+    :param tar_path: Path to the tar archive
+    :param extract_path: Directory where the archive is extracted
+    :returns: None
+    """
+    if not tarfile.is_tarfile(tar_path):
+        raise ExtractError("File '%s' is not a tar archive" % tar_path)
+
+    with tarfile.open(tar_path) as tarf:
+        _check_archive_members(tarf, extract_path)
+        tarf.extractall(extract_path)
+
+
+def _check_archive_members(archive, extract_path):
+    """Check that all files are extracted under extract_path,
+    archive contains only regular files and directories, and extracting the
+    archive does not overwrite anything.
+
+    :param archive: Opened ZipFile or TarFile
+    :returns: None
+    """
+    is_tar = isinstance(archive, tarfile.TarFile)
+    extract_path = os.path.abspath(extract_path)
+
+    for member in archive:
+        filename = member.name if is_tar else member.filename
+        fpath = os.path.abspath(os.path.join(extract_path, filename))
+
+        # Check the filetype
+        if not is_tar:
+            mode = member.external_attr >> 16 # Upper two bytes of ext attr
+            supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+            filetype = FILETYPES[stat.S_IFMT(mode)]
+        else:
+            supported_type = member.isfile() or member.isdir()
+            filetype = TAR_FILE_TYPES[member.type]
+
+        # Check if the archive member is valid
+        if not fpath.startswith(extract_path):
+            raise MemberNameError(
+                "Invalid file path: '%s'" % filename
+            )
+        elif not supported_type:
+            raise MemberTypeError("File '%s' has unsupported type: %s" % (
+                filename, filetype
+            ))
+        elif os.path.isfile(fpath):
+            raise MemberOverwriteError(
+                "File '%s' already exists" % filename
+            )
+
+
+def zipfile_extract(zip_path, extract_path):
+    """Decompress using zipfile module.
+
+    :param zip_path: Path to the zip archive
+    :param extract_path: Directory where the archive is extracted
+    :returns: None
+    """
+    if not zipfile.is_zipfile(zip_path):
+        raise ExtractError("File '%s' is not a zip archive" % zip_path)
+
+    with zipfile.ZipFile(zip_path) as zipf:
+        _check_archive_members(zipf.infolist(), extract_path)
+        zipf.extractall(extract_path)
+
+
+def extract(archive, extract_path):
+    """Extract tar or zip archives.
+
+    :param tar_path: Path to the tar archive
+    :param extract_path: Directory where the archive is extracted
+    :returns: None
+    """
+    if tarfile.is_tarfile(archive):
+        tarfile_extract(archive, extract_path)
+    elif zipfile.is_zipfile(archive):
+        zipfile_extract(archive, extract_path)
+    else:
+        raise ExtractError("File '%s' is not supported" % archive)

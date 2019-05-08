@@ -9,7 +9,7 @@
 %define file_build_number M4_FILE_BUILD_NUMBER
 %define file_commit_ref M4_FILE_COMMIT_REF
 
-Name:           python-archive-helpers
+Name:           archive-helpers
 Version:        %{file_version}
 Release:        %{file_release_number}%{file_release_tag}.%{file_build_number}.git%{file_commit_ref}%{?dist}
 Summary:        Python library for processing various archive formats
@@ -20,7 +20,8 @@ Source0:        %{file_prefix}-v%{file_version}%{?file_release_tag}-%{file_build
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
 
-Requires:       python python-setuptools
+Requires:       python python-setuptools python-click tar bzip2
+BuildRequires:  pytest
 
 %description
 Python library for processing various archive formats. Provides common API for
@@ -33,7 +34,7 @@ find %{_sourcedir}
 %build
 
 %install
-make install PREFIX="%{_prefix}" ROOT="%{buildroot}"
+make install PREFIX="%{_prefix}" DESTDIR="%{buildroot}"
 
 %post
 
