@@ -18,14 +18,14 @@ FILETYPES = {
 }
 
 TAR_FILE_TYPES = {
-    "0": "REG",
-    "1": "LNK",
-    "2": "SYM",
-    "3": "CHR",
-    "4": "BLK",
-    "5": "DIR",
-    "6": "FIFO",
-    "7": "CONT"
+    b"0": "REG",
+    b"1": "LNK",
+    b"2": "SYM",
+    b"3": "CHR",
+    b"4": "BLK",
+    b"5": "DIR",
+    b"6": "FIFO",
+    b"7": "CONT"
 }
 
 

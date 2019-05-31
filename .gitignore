@@ -6,6 +6,7 @@
 *.pyc
 __pycache__
 .cache
+.tox
 INSTALLED_FILES*
 PKG-INFO
 build/
@@ -30,7 +31,7 @@ htmlcov
 coverage.xml
 rpmbuild
 .pytest_cache
-venv
+venv*/
 .venv
 archive.tar
 tmp
