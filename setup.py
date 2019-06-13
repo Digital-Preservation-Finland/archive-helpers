@@ -9,9 +9,11 @@ def main():
     setup(
         name='archive-helpers',
         packages=find_packages(exclude=['tests', 'tests.*']),
+        include_package_data=True,
         version=get_version(),
         install_requires=["click"],
     )
+
 
 if __name__ == '__main__':
     main()
