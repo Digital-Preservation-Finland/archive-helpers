@@ -14,13 +14,17 @@ and use the results of get_version() as your package version:
         ...
     )
 """
+from __future__ import print_function
 
 __all__ = ('get_version',)
 
 import os.path
 import re
 import sys
-from subprocess import Popen, PIPE
+from subprocess import PIPE, Popen
+
+__all__ = ('get_version',)
+
 
 VERSION_RE = re.compile('^Version: (.+)$', re.M)
 
@@ -49,8 +53,10 @@ def write_pkg_info():
 
     #print >> sys.stderr, "%s: Writing version info to '%s'..." % (
     #        PKG_INFO_FILENAME)
-    sys.stderr.write(
-        "Writing version info to '{}'...\n".format(PKG_INFO_FILENAME))
+    print(
+        "Writing version info to '{}'...".format(PKG_INFO_FILENAME),
+        file=sys.stderr
+    )
     with open(PKG_INFO_FILENAME, 'w') as info:
         info.write("Metadata-Version: 1.0\n")
         info.write("Name: microservice\n")
@@ -78,16 +84,18 @@ def get_version():
         else:
             version = '0.0'
 
-        sys.stderr.write(
-            "Version number from GIT repo: {}\n".format(version),
+        print(
+            "Version number from GIT repo: {}".format(version),
+            file=sys.stderr
         )
 
     else:
         write_pkg_info()
         with open(os.path.join(PKG_INFO_FILENAME)) as f:
             version = VERSION_RE.search(f.read()).group(1)
-        sys.stderr.write(
-            "Version number from PKG-INFO: {}\n".format(version)
+        print(
+            "Version number from PKG-INFO: {}".format(version),
+            file=sys.stderr
         )
 
     return version

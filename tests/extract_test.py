@@ -1,20 +1,19 @@
 """Test extract function"""
+from __future__ import unicode_literals
 
+import getpass
 import os
 import socket
-import getpass
 import subprocess
 import tarfile
 
+import six
+
 import pytest
-
-from archive_helpers.extract import (
-    path_to_glfs, cat_tar_extract, tar_extract, zip_extract, extract
-)
-from archive_helpers.extract import (
-    ExtractError, MemberNameError, MemberTypeError, MemberOverwriteError
-)
-
+from archive_helpers.extract import (ExtractError, MemberNameError,
+                                     MemberOverwriteError, MemberTypeError,
+                                     cat_tar_extract, extract, path_to_glfs,
+                                     tar_extract, zip_extract)
 
 TAR_FILES = [
     ("source.tar", ""),
@@ -28,15 +27,17 @@ ARCHIVES = TAR_FILES + [("source.zip", "")]
 def _tar(tmpdir, fname, dir_to_tar, compression=""):
     """Compress compress_dir to tar file"""
     subprocess.call(
-        ["tar", "c%sf" % compression, fname, "-C", str(tmpdir), dir_to_tar],
-        cwd=str(tmpdir)
+        ["tar", "c%sf" % compression, fname, "-C", six.text_type(tmpdir),
+         dir_to_tar],
+        cwd=six.text_type(tmpdir)
     )
 
 
 def _zip(tmpdir, dir_to_zip):
     """Compress compress_dir to zip file"""
     subprocess.call(
-        ["zip", "-r", "source.zip", dir_to_zip, "--symlinks"], cwd=str(tmpdir)
+        ["zip", "-r", "source.zip", dir_to_zip, "--symlinks"],
+        cwd=six.text_type(tmpdir)
     )
 
 
@@ -68,7 +69,7 @@ def glusterfs_fx(tmpdir):
 
     bricks = []
     for brick in range(3):
-        brick_path = str(tmpdir.ensure(
+        brick_path = six.text_type(tmpdir.ensure(
             "glusterfs/brick{}".format(brick), dir=True))
         bricks.append("{}:{}".format(socket.gethostname(), brick_path))
 
@@ -83,7 +84,7 @@ def glusterfs_fx(tmpdir):
     _volume(["status"])
 
     for fname, _ in TAR_FILES:
-        path = str(tmpdir.join(fname))
+        path = six.text_type(tmpdir.join(fname))
         subprocess.call(["gfcp", path, _glfs(fname)])
         os.unlink(path)
 
@@ -93,8 +94,11 @@ def glusterfs_fx(tmpdir):
     _volume(["delete", "glfs_test"])
 
     subprocess.call(
-        ["sudo", "chown", "-R", "{0}:{0}".format(getpass.getuser()),
-         str(tmpdir.join("glusterfs"))])
+        [
+            "sudo", "chown", "-R", "{0}:{0}".format(getpass.getuser()),
+            six.text_type(tmpdir.join("glusterfs"))
+        ]
+    )
 
 
 @pytest.mark.parametrize("archive", TAR_FILES)
@@ -104,8 +108,8 @@ def test_tar_extract(archive, tmpdir):
     _tar(tmpdir, fname, "source", compression)
 
     tar_extract(
-        str(tmpdir.join(fname)),
-        str(tmpdir.join("destination"))
+        six.text_type(tmpdir.join(fname)),
+        six.text_type(tmpdir.join("destination"))
     )
     assert tmpdir.join("destination/source/file1").check()
 
@@ -117,8 +121,8 @@ def test_cat_tar_extract(archive, tmpdir):
     _tar(tmpdir, fname, "source", compression)
 
     cat_tar_extract(
-        str(tmpdir.join(fname)),
-        str(tmpdir.join("destination"))
+        six.text_type(tmpdir.join(fname)),
+        six.text_type(tmpdir.join("destination"))
     )
     assert tmpdir.join(fname).check()
     assert tmpdir.join("destination/source/file1").check()
@@ -133,12 +137,12 @@ def test_gfcat_tar_extract(archive, tmpdir):
     fname, _ = archive
 
     source_path = path_to_glfs(
-        source_path=str(tmpdir.join("glfs_test/{}".format(fname))),
-        mount_path=str(tmpdir),
+        source_path=six.text_type(tmpdir.join("glfs_test/{}".format(fname))),
+        mount_path=six.text_type(tmpdir),
         glusterfs_host=socket.gethostname())
 
     cat_tar_extract(
-        source_path, str(tmpdir.join("destination")), cat="gfcat")
+        source_path, six.text_type(tmpdir.join("destination")), cat="gfcat")
 
     assert not tmpdir.join(fname).check()
     assert tmpdir.join("destination/source/file1").check()
@@ -149,8 +153,8 @@ def test_zip_extract(tmpdir):
     _zip(tmpdir, "source")
 
     zip_extract(
-        str(tmpdir.join("source.zip")),
-        str(tmpdir.join("destination")))
+        six.text_type(tmpdir.join("source.zip")),
+        six.text_type(tmpdir.join("destination")))
 
     assert tmpdir.join("destination/source/file1").check()
 
@@ -159,10 +163,11 @@ def test_extract_regular_file(tmpdir):
     """Test that trying to extract a regular file raises ExtractError"""
     with pytest.raises(ExtractError) as error:
         extract(
-            str(tmpdir.join("source/file1")), str(tmpdir.join("destination"))
+            six.text_type(tmpdir.join("source/file1")),
+            six.text_type(tmpdir.join("destination"))
         )
 
-    assert str(error.value).endswith("is not supported")
+    assert six.text_type(error.value).endswith("is not supported")
 
 
 @pytest.mark.parametrize("archive", ARCHIVES)
@@ -176,10 +181,12 @@ def test_extract_symlink(archive, tmpdir):
 
     with pytest.raises(MemberTypeError) as error:
         extract(
-            str(tmpdir.join(fname)), str(tmpdir.join("destination"))
+            six.text_type(tmpdir.join(fname)),
+            six.text_type(tmpdir.join("destination"))
         )
 
-    assert str(error.value) == "File 'symlink/link' has unsupported type: SYM"
+    assert six.text_type(error.value) == \
+        "File 'symlink/link' has unsupported type: SYM"
 
 
 @pytest.mark.parametrize("archive", ARCHIVES)
@@ -193,10 +200,10 @@ def test_extract_overwrite(archive, tmpdir):
 
     with pytest.raises(MemberOverwriteError) as error:
         extract(
-            str(tmpdir.join(fname)), str(tmpdir)
+            six.text_type(tmpdir.join(fname)), six.text_type(tmpdir)
         )
 
-    assert str(error.value) == "File 'source/file1' already exists"
+    assert six.text_type(error.value) == "File 'source/file1' already exists"
 
 
 @pytest.mark.parametrize("path", [
@@ -211,29 +218,31 @@ def test_extract_relative_paths(path, tmpdir):
     """
     path, valid_path = path
 
-    with tarfile.open(str(tmpdir.join("test.tar")), "w") as tarf:
-        tarf.add(str(tmpdir.join("source/file1")), arcname=path)
+    with tarfile.open(six.text_type(tmpdir.join("test.tar")), "w") as tarf:
+        tarf.add(six.text_type(tmpdir.join("source/file1")), arcname=path)
 
     if valid_path:
         extract(
-            str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
+            six.text_type(tmpdir.join("test.tar")),
+            six.text_type(tmpdir.join("destination"))
         )
     else:
         with pytest.raises(MemberNameError) as error:
             extract(
-                str(tmpdir.join("test.tar")), str(tmpdir.join("destination"))
+                six.text_type(tmpdir.join("test.tar")),
+                six.text_type(tmpdir.join("destination"))
             )
-        assert str(error.value) == "Invalid file path: '%s'" % path
+        assert six.text_type(error.value) == "Invalid file path: '%s'" % path
 
 
 def _tar_absolute_path(tmpdir, fname, compression=""):
     """Create tar archives with absolute paths"""
-    archive = str(tmpdir.join(fname))
+    archive = six.text_type(tmpdir.join(fname))
     command = [
         "tar", "-c%sf" % compression, archive, "source/file1",
         "--transform", "s|source/file1|/file1|"
     ]
-    subprocess.call(command, cwd=str(tmpdir))
+    subprocess.call(command, cwd=six.text_type(tmpdir))
 
 
 @pytest.mark.parametrize("archive", TAR_FILES)
@@ -246,10 +255,11 @@ def test_extract_absolute_path(archive, tmpdir):
 
     with pytest.raises(MemberNameError) as error:
         extract(
-            str(tmpdir.join(fname)), str(tmpdir.join("destination"))
+            six.text_type(tmpdir.join(fname)),
+            six.text_type(tmpdir.join("destination"))
         )
 
-    assert str(error.value) == "Invalid file path: '/file1'"
+    assert six.text_type(error.value) == "Invalid file path: '/file1'"
 
 
 @pytest.mark.parametrize("archive", ARCHIVES)
@@ -262,7 +272,8 @@ def test_extract_success(archive, tmpdir):
         _tar(tmpdir, fname, "source", compression)
 
     extract(
-        str(tmpdir.join(fname)), str(tmpdir.join("destination"))
+        six.text_type(tmpdir.join(fname)),
+        six.text_type(tmpdir.join("destination"))
     )
 
     assert len(tmpdir.join("destination").listdir()) == 1
