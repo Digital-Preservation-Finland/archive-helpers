@@ -1,11 +1,14 @@
 """Command line utility for archive library"""
-
+from __future__ import unicode_literals
 
 import os
+
 import click
 
+from archive_helpers.extract import cat_tar_extract
 
-from archive_helpers.extract import (cat_tar_extract)
+
+click.disable_unicode_literals_warning = True
 
 
 @click.group()

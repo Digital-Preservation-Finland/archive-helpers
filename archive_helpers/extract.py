@@ -1,4 +1,5 @@
 """Extract/decompress various archive formats"""
+from __future__ import unicode_literals
 
 import os
 import stat
@@ -194,7 +195,7 @@ def _check_archive_members(archive, extract_path):
 
         # Check the filetype
         if not is_tar:
-            mode = member.external_attr >> 16 # Upper two bytes of ext attr
+            mode = member.external_attr >> 16  # Upper two bytes of ext attr
             supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
             filetype = FILETYPES[stat.S_IFMT(mode)]
         else:
