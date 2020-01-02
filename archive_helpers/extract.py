@@ -217,12 +217,11 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
             raise MemberTypeError("File '%s' has unsupported type: %s" % (
                 filename, filetype
             ))
-        elif os.path.isfile(fpath):
-            # Do not raise error if overwriting member files is permitted
-            if not allow_overwrite:
-                raise MemberOverwriteError(
-                    "File '%s' already exists" % filename
-                )
+        # Do not raise error if overwriting member files is permitted
+        elif os.path.isfile(fpath) and not allow_overwrite:
+            raise MemberOverwriteError(
+                "File '%s' already exists" % filename
+            )
 
 
 def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
