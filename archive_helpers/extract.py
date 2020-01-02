@@ -168,7 +168,7 @@ def tarfile_extract(tar_path, extract_path, allow_overwrite=False):
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
-    :param allow_overwrite: Boolean for allowing overwriting member files
+    :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :returns: None
     """
@@ -188,7 +188,7 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
 
     :param archive: Opened ZipFile or TarFile
     :param extract_path: Directory where the archive is extracted
-    :param allow_overwrite: Boolean for allowing overwriting member files
+    :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :returns: None
     """
@@ -230,7 +230,7 @@ def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
 
     :param zip_path: Path to the zip archive
     :param extract_path: Directory where the archive is extracted
-    :param allow_overwrite: Boolean for allowing overwriting member files
+    :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :returns: None
     """
@@ -248,7 +248,7 @@ def extract(archive, extract_path, allow_overwrite=False):
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
-    :param allow_overwrite: Boolean for allowing overwriting member files
+    :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :returns: None
     """
