@@ -189,21 +189,38 @@ def test_extract_symlink(archive, tmpdir):
         "File 'symlink/link' has unsupported type: SYM"
 
 
+@pytest.mark.parametrize(("allow_overwrite"), [
+    (False),
+    (True)
+])
 @pytest.mark.parametrize("archive", ARCHIVES)
-def test_extract_overwrite(archive, tmpdir):
-    """Test that trying to overwrite files raises MemberOverwriteError"""
+def test_extract_overwrite(archive, allow_overwrite, tmpdir):
+    """Test that trying to overwrite files raises MemberOverwriteError
+    if allow_overwrite is False. Else the operation should succeed.
+    """
     fname, compression = archive
     if fname.endswith(".zip"):
         _zip(tmpdir, "source")
     else:
         _tar(tmpdir, fname, "source", compression)
 
-    with pytest.raises(MemberOverwriteError) as error:
-        extract(
-            six.text_type(tmpdir.join(fname)), six.text_type(tmpdir)
-        )
+    if not allow_overwrite:
+        with pytest.raises(MemberOverwriteError) as error:
+            extract(
+                six.text_type(tmpdir.join(fname)),
+                six.text_type(tmpdir),
+                allow_overwrite=allow_overwrite
+            )
 
-    assert six.text_type(error.value) == "File 'source/file1' already exists"
+        assert six.text_type(
+            error.value) == "File 'source/file1' already exists"
+    else:
+        extract(
+            six.text_type(tmpdir.join(fname)),
+            six.text_type(tmpdir),
+            allow_overwrite=allow_overwrite
+        )
+        assert tmpdir.join("source/file1").check()
 
 
 @pytest.mark.parametrize("path", [

@@ -163,27 +163,33 @@ class MemberOverwriteError(Exception):
     pass
 
 
-def tarfile_extract(tar_path, extract_path):
+def tarfile_extract(tar_path, extract_path, allow_overwrite=False):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
+    :param allow_overwrite: Boolean for allowing overwriting member files
+                            without raising an error (defaults to False)
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
         raise ExtractError("File '%s' is not a tar archive" % tar_path)
 
     with tarfile.open(tar_path) as tarf:
-        _check_archive_members(tarf, extract_path)
+        _check_archive_members(
+            tarf, extract_path, allow_overwrite=allow_overwrite)
         tarf.extractall(extract_path)
 
 
-def _check_archive_members(archive, extract_path):
+def _check_archive_members(archive, extract_path, allow_overwrite=False):
     """Check that all files are extracted under extract_path,
     archive contains only regular files and directories, and extracting the
     archive does not overwrite anything.
 
     :param archive: Opened ZipFile or TarFile
+    :param extract_path: Directory where the archive is extracted
+    :param allow_overwrite: Boolean for allowing overwriting member files
+                            without raising an error (defaults to False)
     :returns: None
     """
     is_tar = isinstance(archive, tarfile.TarFile)
@@ -212,36 +218,43 @@ def _check_archive_members(archive, extract_path):
                 filename, filetype
             ))
         elif os.path.isfile(fpath):
-            raise MemberOverwriteError(
-                "File '%s' already exists" % filename
-            )
+            # Do not raise error if overwriting member files is permitted
+            if not allow_overwrite:
+                raise MemberOverwriteError(
+                    "File '%s' already exists" % filename
+                )
 
 
-def zipfile_extract(zip_path, extract_path):
+def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
     """Decompress using zipfile module.
 
     :param zip_path: Path to the zip archive
     :param extract_path: Directory where the archive is extracted
+    :param allow_overwrite: Boolean for allowing overwriting member files
+                            without raising an error (defaults to False)
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File '%s' is not a zip archive" % zip_path)
 
     with zipfile.ZipFile(zip_path) as zipf:
-        _check_archive_members(zipf.infolist(), extract_path)
+        _check_archive_members(
+            zipf.infolist(), extract_path, allow_overwrite=allow_overwrite)
         zipf.extractall(extract_path)
 
 
-def extract(archive, extract_path):
+def extract(archive, extract_path, allow_overwrite=False):
     """Extract tar or zip archives.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
+    :param allow_overwrite: Boolean for allowing overwriting member files
+                            without raising an error (defaults to False)
     :returns: None
     """
     if tarfile.is_tarfile(archive):
-        tarfile_extract(archive, extract_path)
+        tarfile_extract(archive, extract_path, allow_overwrite=allow_overwrite)
     elif zipfile.is_zipfile(archive):
-        zipfile_extract(archive, extract_path)
+        zipfile_extract(archive, extract_path, allow_overwrite=allow_overwrite)
     else:
         raise ExtractError("File '%s' is not supported" % archive)
