@@ -203,7 +203,10 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
         if not is_tar:
             mode = member.external_attr >> 16  # Upper two bytes of ext attr
             supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
-            filetype = FILETYPES[stat.S_IFMT(mode)]
+            # Support zip archives made with non-POSIX compliant operating
+            # systems where file mode is not specified, e.g., windows.
+            supported_type |= (mode == 0)
+            filetype = FILETYPES[stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
         else:
             supported_type = member.isfile() or member.isdir()
             filetype = TAR_FILE_TYPES[member.type]
@@ -218,7 +221,7 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
                 filename, filetype
             ))
         # Do not raise error if overwriting member files is permitted
-        elif os.path.isfile(fpath) and not allow_overwrite:
+        elif not allow_overwrite and os.path.isfile(fpath):
             raise MemberOverwriteError(
                 "File '%s' already exists" % filename
             )
