@@ -296,3 +296,48 @@ def test_extract_success(archive, tmpdir):
     assert len(tmpdir.join("destination").listdir()) == 1
     assert len(tmpdir.join("destination/source").listdir()) == 1
     assert tmpdir.join("destination/source/file1").check()
+
+
+@pytest.mark.parametrize(
+    "archive,dirs,files",
+    [
+        ("tests/data/windows_zip.zip", (
+            "windows_zip",
+            "windows_zip/directory"
+        ), (
+            "windows_zip/directory/file.txt",
+            "windows_zip/directory/file2.txt"
+        )),
+        ("tests/data/windows_zip_symlinks.zip", (
+            "windows_zip_symlinks",
+            "windows_zip_symlinks/directory",
+            "windows_zip_symlinks/directory_junction_link",
+            "windows_zip_symlinks/soft_link"
+        ), (
+            "windows_zip_symlinks/file.txt",
+            "windows_zip_symlinks/symlink",
+            "windows_zip_symlinks/hard_link",
+            "windows_zip_symlinks/directory/file.txt",
+            "windows_zip_symlinks/directory/file2.txt",
+            "windows_zip_symlinks/soft_link/file.txt",
+            "windows_zip_symlinks/soft_link/file2.txt"
+        )),
+    ],
+    ids=["files", "links"]
+)
+def test_extract_zip_windows(archive, dirs, files, tmpdir):
+    """Test that zip archives made on windows are correctly extracted and only
+    regular files and directories are created.
+    """
+    extract(
+        six.text_type(archive),
+        six.text_type(tmpdir)
+    )
+
+    for _dir in dirs:
+        path = str(tmpdir.join(_dir))
+        assert os.path.isdir(path)
+
+    for _file in files:
+        path = str(tmpdir.join(_file))
+        assert os.path.isfile(path)
