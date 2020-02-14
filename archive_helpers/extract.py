@@ -7,7 +7,6 @@ import subprocess
 import tarfile
 import zipfile
 
-
 FILETYPES = {
     0o010000: "FIFO",
     0o020000: "CHR",
@@ -163,13 +162,18 @@ class MemberOverwriteError(Exception):
     pass
 
 
-def tarfile_extract(tar_path, extract_path, allow_overwrite=False):
+def tarfile_extract(tar_path,
+                    extract_path,
+                    allow_overwrite=False,
+                    use_stream=False):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
+    :param use_stream: Use stream read mode to increase handling speed at cost
+                       of pre-validation.
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -192,39 +196,80 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
                             without raising an error (defaults to False)
     :returns: None
     """
-    is_tar = isinstance(archive, tarfile.TarFile)
     extract_path = os.path.abspath(extract_path)
 
     for member in archive:
-        filename = member.name if is_tar else member.filename
-        fpath = os.path.abspath(os.path.join(extract_path, filename))
+        _validate_member(member=member,
+                         extract_path=extract_path,
+                         allow_overwrite=allow_overwrite)
 
-        # Check the filetype
-        if not is_tar:
-            mode = member.external_attr >> 16  # Upper two bytes of ext attr
-            supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
-            # Support zip archives made with non-POSIX compliant operating
-            # systems where file mode is not specified, e.g., windows.
-            supported_type |= (mode == 0)
-            filetype = FILETYPES[stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
-        else:
-            supported_type = member.isfile() or member.isdir()
-            filetype = TAR_FILE_TYPES[member.type]
 
-        # Check if the archive member is valid
-        if not fpath.startswith(extract_path):
-            raise MemberNameError(
-                "Invalid file path: '%s'" % filename
-            )
-        elif not supported_type:
-            raise MemberTypeError("File '%s' has unsupported type: %s" % (
-                filename, filetype
-            ))
-        # Do not raise error if overwriting member files is permitted
-        elif not allow_overwrite and os.path.isfile(fpath):
-            raise MemberOverwriteError(
-                "File '%s' already exists" % filename
-            )
+def _validate_member(member, extract_path, allow_overwrite=False):
+    """Validates that there are no issues with given member.
+
+    :param member: ZipInfo or TarInfo member.
+    :param extract_path: Directory where the archive is extracted to
+    :param allow_overwrite: Boolean to allow overwriting existing files
+                            without raising an error (defaults to False).
+    :raises: MemberNameError is raised when filename is invalid for the member.
+    :raises: MemberTypeError is raised when the member is of unsupported
+        filetype.
+    :raises: MemberOverwriteError If an existing file was discovered in the
+        extract patch.
+    """
+
+    def _tar_filetype_evaluation():
+        """Inner function to set the supported_type and file_type variables
+        for zip files.
+        :returns: Tuple of (supported_type, filetype)
+        """
+        return member.isfile() or member.isdir(), TAR_FILE_TYPES[member.type]
+
+    def _zip_filetype_evaluation():
+        """Inner function to set the supported_type and file_type variables
+        for tar files.
+        :returns: Tuple of (supported_type, filetype)
+        """
+        mode = member.external_attr >> 16  # Upper two bytes of ext attr
+        supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+        # Support zip archives made with non-POSIX compliant operating
+        # systems where file mode is not specified, e.g., windows.
+        supported_type |= (mode == 0)
+        filetype = FILETYPES[
+            stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
+
+        return supported_type, filetype
+
+    _get_filename = {
+        'TarInfo': lambda: member.name,
+        'ZipInfo': lambda: member.filename
+    }
+    _evaluate_filetypes = {
+        'TarInfo': _tar_filetype_evaluation,
+        'ZipInfo': _zip_filetype_evaluation
+    }
+    member_type_instance = member.__class__.__name__
+
+    filename = _get_filename[member_type_instance]()
+    fpath = os.path.abspath(os.path.join(extract_path, filename))
+
+    # Evaluate the filetype
+    supported_type, filetype = _evaluate_filetypes[member_type_instance]()
+
+    # Check if the archive member is valid
+    if not fpath.startswith(extract_path):
+        raise MemberNameError(
+            "Invalid file path: '%s'" % filename
+        )
+    elif not supported_type:
+        raise MemberTypeError("File '%s' has unsupported type: %s" % (
+            filename, filetype
+        ))
+    # Do not raise error if overwriting member files is permitted
+    elif not allow_overwrite and os.path.isfile(fpath):
+        raise MemberOverwriteError(
+            "File '%s' already exists" % filename
+        )
 
 
 def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
@@ -245,17 +290,26 @@ def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
         zipf.extractall(extract_path)
 
 
-def extract(archive, extract_path, allow_overwrite=False):
-    """Extract tar or zip archives.
+def extract(archive, extract_path, allow_overwrite=False, use_stream=False):
+    """Extract tar or zip archives. Additionally, tar archives can be handled
+    as stream.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
+    :param use_stream: Boolean for tar archives whether to handle the archive
+                       as stream or not. Handling as stream increases the
+                       extraction process, but files would be validated one by
+                       one instead of full validation before extraction
+                       (defaults to False).
     :returns: None
     """
     if tarfile.is_tarfile(archive):
-        tarfile_extract(archive, extract_path, allow_overwrite=allow_overwrite)
+        tarfile_extract(archive,
+                        extract_path,
+                        allow_overwrite=allow_overwrite,
+                        use_stream=use_stream)
     elif zipfile.is_zipfile(archive):
         zipfile_extract(archive, extract_path, allow_overwrite=allow_overwrite)
     else:
