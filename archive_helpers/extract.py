@@ -179,10 +179,26 @@ def tarfile_extract(tar_path,
     if not tarfile.is_tarfile(tar_path):
         raise ExtractError("File '%s' is not a tar archive" % tar_path)
 
-    with tarfile.open(tar_path) as tarf:
-        _check_archive_members(
-            tarf, extract_path, allow_overwrite=allow_overwrite)
-        tarf.extractall(extract_path)
+    if not use_stream:
+        with tarfile.open(tar_path) as tarf:
+            _check_archive_members(
+                tarf, extract_path, allow_overwrite=allow_overwrite)
+            tarf.extractall(extract_path)
+    else:
+        # Reduce the number of full read required by evaluating and extracting
+        # during read.
+        with tarfile.open(tar_path, 'r|*') as tarf:
+            extract_abs_path = os.path.abspath(extract_path)
+            for member in tarf:
+                _validate_member(member,
+                                 extract_path=extract_abs_path,
+                                 allow_overwrite=allow_overwrite)
+                tarf.extract(member, path=extract_abs_path)
+                # Memory caching issue during pre-python3 as mentioned here:
+                # https://stackoverflow.com/a/21092098
+                # The workaround is to reset the members information for the
+                # archive.
+                tarf.members = []
 
 
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
