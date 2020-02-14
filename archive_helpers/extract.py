@@ -173,7 +173,10 @@ def tarfile_extract(tar_path,
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :param use_stream: Use stream read mode to increase handling speed at cost
-                       of pre-validation.
+                       of pre-validation advantage. If issue arises in middle
+                       of stream extraction, then extraction halts and files
+                       that were extracted is up to the caller's discretion
+                       on how they would be handled (ie cleaning them up).
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -314,7 +317,7 @@ def extract(archive, extract_path, allow_overwrite=False, use_stream=False):
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :param use_stream: Boolean for tar archives whether to handle the archive
-                       as stream or not. Handling as stream increases the
+                       as stream or not. Handling as stream hastens the
                        extraction process, but files would be validated one by
                        one instead of full validation before extraction
                        (defaults to False).
