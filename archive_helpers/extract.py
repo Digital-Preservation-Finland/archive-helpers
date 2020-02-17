@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import os
+import shutil
 import stat
 import subprocess
 import tarfile
@@ -173,10 +174,7 @@ def tarfile_extract(tar_path,
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
     :param use_stream: Use stream read mode to increase handling speed at cost
-                       of pre-validation advantage. If issue arises in middle
-                       of stream extraction, then extraction halts and files
-                       that were extracted is up to the caller's discretion
-                       on how they would be handled (ie cleaning them up).
+                       of pre-validation advantage.
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -190,18 +188,30 @@ def tarfile_extract(tar_path,
     else:
         # Reduce the number of full read required by evaluating and extracting
         # during read.
-        with tarfile.open(tar_path, 'r|*') as tarf:
-            extract_abs_path = os.path.abspath(extract_path)
-            for member in tarf:
-                _validate_member(member,
-                                 extract_path=extract_abs_path,
-                                 allow_overwrite=allow_overwrite)
-                tarf.extract(member, path=extract_abs_path)
-                # Memory caching issue during pre-python3 as mentioned here:
-                # https://stackoverflow.com/a/21092098
-                # The workaround is to reset the members information for the
-                # archive.
-                tarf.members = []
+        discovered_members = set()  # Used for cleanup if validation fails.
+        extract_abs_path = os.path.abspath(extract_path)
+        try:
+            with tarfile.open(tar_path, 'r|*') as tarf:
+                for member in tarf:
+                    _validate_member(member,
+                                     extract_path=extract_abs_path,
+                                     allow_overwrite=allow_overwrite)
+                    discovered_members.add(member.name)
+                    tarf.extract(member, path=extract_abs_path)
+                    # Memory caching issue during pre-python3 as mentioned here:
+                    # https://stackoverflow.com/a/21092098
+                    # The workaround is to reset the members information for the
+                    # archive.
+                    tarf.members = []
+        except (MemberNameError, MemberTypeError, MemberOverwriteError) as err:
+            # Validation failed so cleaning up the discovered members.
+            for member in discovered_members:
+                fpath = os.path.abspath(os.path.join(extract_path, member))
+                if os.path.isfile(fpath):
+                    os.remove(fpath)
+                elif os.path.isdir(fpath):
+                    shutil.rmtree(fpath)
+            raise err
 
 
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
