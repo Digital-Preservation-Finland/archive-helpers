@@ -188,7 +188,7 @@ def tarfile_extract(tar_path,
     else:
         # Reduce the number of full read required by evaluating and extracting
         # during read.
-        discovered_members = set()  # Used for cleanup if validation fails.
+        discovered_members = []  # Used for cleanup if validation fails.
         extract_abs_path = os.path.abspath(extract_path)
         try:
             with tarfile.open(tar_path, 'r|*') as tarf:
@@ -196,7 +196,7 @@ def tarfile_extract(tar_path,
                     _validate_member(member,
                                      extract_path=extract_abs_path,
                                      allow_overwrite=allow_overwrite)
-                    discovered_members.add(member.name)
+                    discovered_members.append(member.name)
                     tarf.extract(member, path=extract_abs_path)
                     # Memory caching issue during pre-python3 as mentioned here:
                     # https://stackoverflow.com/a/21092098
