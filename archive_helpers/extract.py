@@ -165,7 +165,7 @@ class MemberOverwriteError(Exception):
 def tarfile_extract(tar_path,
                     extract_path,
                     allow_overwrite=False,
-                    precheck=False):
+                    precheck=True):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
