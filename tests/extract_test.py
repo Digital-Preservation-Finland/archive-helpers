@@ -279,15 +279,15 @@ def test_extract_absolute_path(archive, tmpdir):
     assert six.text_type(error.value) == "Invalid file path: '/file1'"
 
 
-@pytest.mark.parametrize('use_stream', [
-    False,
-    True
+@pytest.mark.parametrize('precheck', [
+    True,
+    False
 ], ids=[
-    'Extract by default behaviour',
-    'Extract by stream'
+    'Extract with the precheck',
+    'Extract without the precheck'
 ])
 @pytest.mark.parametrize("archive", ARCHIVES)
-def test_extract_success(archive, use_stream, tmpdir):
+def test_extract_success(archive, precheck, tmpdir):
     """Test that tar and zip archives are correctly extracted."""
     fname, compression = archive
     if fname.endswith(".zip"):
@@ -298,7 +298,7 @@ def test_extract_success(archive, use_stream, tmpdir):
     extract(
         six.text_type(tmpdir.join(fname)),
         six.text_type(tmpdir.join("destination")),
-        use_stream=use_stream
+        precheck=precheck
     )
 
     assert len(tmpdir.join("destination").listdir()) == 1
@@ -308,21 +308,29 @@ def test_extract_success(archive, use_stream, tmpdir):
 
 @pytest.mark.parametrize(
     ('archive', 'dirs', 'files'),
-    [("tests/data/windows_zip.zip",
-      ("windows_zip", "windows_zip/directory"),
-      ("windows_zip/directory/file.txt", "windows_zip/directory/file2.txt")),
-     ("tests/data/windows_zip_symlinks.zip",
-      ("windows_zip_symlinks",
-       "windows_zip_symlinks/directory",
-       "windows_zip_symlinks/directory_junction_link",
-       "windows_zip_symlinks/soft_link"),
-      ("windows_zip_symlinks/file.txt",
-       "windows_zip_symlinks/symlink",
-       "windows_zip_symlinks/hard_link",
-       "windows_zip_symlinks/directory/file.txt",
-       "windows_zip_symlinks/directory/file2.txt",
-       "windows_zip_symlinks/soft_link/file.txt",
-       "windows_zip_symlinks/soft_link/file2.txt"))],
+    [
+        ("tests/data/windows_zip.zip", (
+            "windows_zip",
+            "windows_zip/directory"
+        ), (
+            "windows_zip/directory/file.txt",
+            "windows_zip/directory/file2.txt"
+        )),
+        ("tests/data/windows_zip_symlinks.zip", (
+            "windows_zip_symlinks",
+            "windows_zip_symlinks/directory",
+            "windows_zip_symlinks/directory_junction_link",
+            "windows_zip_symlinks/soft_link"
+        ), (
+            "windows_zip_symlinks/file.txt",
+            "windows_zip_symlinks/symlink",
+            "windows_zip_symlinks/hard_link",
+            "windows_zip_symlinks/directory/file.txt",
+            "windows_zip_symlinks/directory/file2.txt",
+            "windows_zip_symlinks/soft_link/file.txt",
+            "windows_zip_symlinks/soft_link/file2.txt"
+        ))
+    ],
     ids=["files", "links"]
 )
 def test_extract_zip_windows(archive, dirs, files, tmpdir):

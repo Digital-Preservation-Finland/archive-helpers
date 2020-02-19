@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 import os
-import shutil
 import stat
 import subprocess
 import tarfile
@@ -166,52 +165,85 @@ class MemberOverwriteError(Exception):
 def tarfile_extract(tar_path,
                     extract_path,
                     allow_overwrite=False,
-                    use_stream=False):
+                    precheck=False):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
-    :param use_stream: Use stream read mode to increase handling speed at cost
-                       of pre-validation advantage.
+    :param precheck: Boolean that defines whether to check to whole archive
+                     before extraction or not. If True, user does not need to
+                     worry about the cleanup. If False, archive is read only
+                     once and the members are extracted immediately after the
+                     check. User is responsible for the cleanup if member check
+                     raises an error with precheck=False.
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
         raise ExtractError("File '%s' is not a tar archive" % tar_path)
 
-    if not use_stream:
-        with tarfile.open(tar_path) as tarf:
+    if precheck:
+        with tarfile.open(tar_path, 'r|*') as tarf:
             _check_archive_members(
-                tarf, extract_path, allow_overwrite=allow_overwrite)
+                tarf, extract_path,
+                allow_overwrite=allow_overwrite
+            )
+        with tarfile.open(tar_path, 'r|*') as tarf:
             tarf.extractall(extract_path)
     else:
-        # Reduce the number of full read required by evaluating and extracting
-        # during read.
-        discovered_members = []  # Used for cleanup if validation fails.
+        # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
-        try:
-            with tarfile.open(tar_path, 'r|*') as tarf:
-                for member in tarf:
-                    _validate_member(member,
-                                     extract_path=extract_abs_path,
-                                     allow_overwrite=allow_overwrite)
-                    discovered_members.append(member.name)
-                    tarf.extract(member, path=extract_abs_path)
-                    # Memory caching issue during pre-python3 as mentioned here:
-                    # https://stackoverflow.com/a/21092098
-                    # The workaround is to reset the members information for the
-                    # archive.
-                    tarf.members = []
-        except (MemberNameError, MemberTypeError, MemberOverwriteError) as err:
-            # Validation failed so cleaning up the discovered members.
-            for member in discovered_members:
-                fpath = os.path.abspath(os.path.join(extract_path, member))
-                if os.path.isfile(fpath):
-                    os.remove(fpath)
-                elif os.path.isdir(fpath):
-                    shutil.rmtree(fpath)
-            raise err
+        with tarfile.open(tar_path, 'r|*') as tarf:
+            for member in tarf:
+                _validate_member(member,
+                                 extract_path=extract_abs_path,
+                                 allow_overwrite=allow_overwrite)
+                tarf.extract(member, path=extract_abs_path)
+                # Memory caching issue during pre-python3 as mentioned here:
+                # https://stackoverflow.com/a/21092098
+                # The workaround is to reset the members information for the
+                # archive.
+                tarf.members = []
+
+
+def zipfile_extract(zip_path,
+                    extract_path,
+                    allow_overwrite=False,
+                    precheck=True):
+    """Decompress using zipfile module.
+
+    :param zip_path: Path to the zip archive
+    :param extract_path: Directory where the archive is extracted
+    :param allow_overwrite: Boolean to allow overwriting existing files
+                            without raising an error (defaults to False)
+    :param precheck: Boolean that defines whether to check to whole archive
+                     before extraction or not. If True, user does not need to
+                     worry about the cleanup. If False, archive is read only
+                     once and the members are extracted immediately after the
+                     check. User is responsible for the cleanup if member check
+                     raises an error with precheck=False.
+    :returns: None
+    """
+    if not zipfile.is_zipfile(zip_path):
+        raise ExtractError("File '%s' is not a zip archive" % zip_path)
+
+    with zipfile.ZipFile(zip_path) as zipf:
+        if precheck:
+            _check_archive_members(
+                zipf.infolist(), extract_path,
+                allow_overwrite=allow_overwrite
+            )
+            zipf.extractall(extract_path)
+        else:
+            for member in zipf.infolist():
+                # Read archive only once by extracting files on the fly
+                extract_abs_path = os.path.abspath(extract_path)
+                _validate_member(member,
+                                 extract_path=extract_abs_path,
+                                 allow_overwrite=allow_overwrite)
+                zipf.extract(member, path=extract_abs_path)
+
 
 
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
@@ -300,25 +332,7 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         )
 
 
-def zipfile_extract(zip_path, extract_path, allow_overwrite=False):
-    """Decompress using zipfile module.
-
-    :param zip_path: Path to the zip archive
-    :param extract_path: Directory where the archive is extracted
-    :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False)
-    :returns: None
-    """
-    if not zipfile.is_zipfile(zip_path):
-        raise ExtractError("File '%s' is not a zip archive" % zip_path)
-
-    with zipfile.ZipFile(zip_path) as zipf:
-        _check_archive_members(
-            zipf.infolist(), extract_path, allow_overwrite=allow_overwrite)
-        zipf.extractall(extract_path)
-
-
-def extract(archive, extract_path, allow_overwrite=False, use_stream=False):
+def extract(archive, extract_path, allow_overwrite=False, precheck=True):
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
 
@@ -326,19 +340,23 @@ def extract(archive, extract_path, allow_overwrite=False, use_stream=False):
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
-    :param use_stream: Boolean for tar archives whether to handle the archive
-                       as stream or not. Handling as stream hastens the
-                       extraction process, but files would be validated one by
-                       one instead of full validation before extraction
-                       (defaults to False).
+    :param precheck: Boolean that defines whether to check to whole archive
+                     before extraction or not. If True, user does not need to
+                     worry about the cleanup. If False, archive is read only
+                     once and the members are extracted immediately after the
+                     check. User is responsible for the cleanup if member check
+                     raises an error with precheck=False.
     :returns: None
     """
     if tarfile.is_tarfile(archive):
         tarfile_extract(archive,
                         extract_path,
                         allow_overwrite=allow_overwrite,
-                        use_stream=use_stream)
+                        precheck=precheck)
     elif zipfile.is_zipfile(archive):
-        zipfile_extract(archive, extract_path, allow_overwrite=allow_overwrite)
+        zipfile_extract(archive,
+                        extract_path,
+                        allow_overwrite=allow_overwrite,
+                        precheck=precheck)
     else:
         raise ExtractError("File '%s' is not supported" % archive)
