@@ -12,6 +12,16 @@ install:
 	    --root="${DESTDIR}" \
 	    --record=INSTALLED_FILES
 
+install3:
+	# Cleanup temporary files
+	rm -f INSTALLED_FILES
+
+	# Use Python setuptools
+	python3 ./setup.py install -O1 \
+	    --prefix="${PREFIX}" \
+	    --root="${DESTDIR}" \
+	    --record=INSTALLED_FILES
+
 test:
 	py.test  tests -v -m "not gluster" \
 	    --junitprefix=archives-helper --junitxml=junit.xml
@@ -33,4 +43,9 @@ clean-rpm:
 rpm: clean
 	create-archive.sh
 	preprocess-spec-m4-macros.sh include/rhel7
+	build-rpm.sh
+
+rpm3: clean
+	create-archive.sh
+	preprocess-spec-m4-macros.sh include/rhel8
 	build-rpm.sh
