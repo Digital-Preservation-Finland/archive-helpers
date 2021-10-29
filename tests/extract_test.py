@@ -148,6 +148,16 @@ def test_gfcat_tar_extract(archive, tmpdir):
     assert tmpdir.join("destination/source/file1").check()
 
 
+def test_blank_tar_extract(tmpdir):
+    """Test that extracting a blank tar archive raises ExtractError."""
+    with pytest.raises(ExtractError) as error:
+        extract(
+            six.text_type("tests/data/blank_tar.tar"),
+            six.text_type(tmpdir)
+        )
+    assert "Blank tar archives" in str(error.value)
+
+
 def test_zip_extract(tmpdir):
     """Test the zip extract functionality"""
     _zip(tmpdir, "source")

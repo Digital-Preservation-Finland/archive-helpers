@@ -1,6 +1,7 @@
 """Extract/decompress various archive formats"""
 from __future__ import unicode_literals
 
+import errno
 import os
 import stat
 import subprocess
@@ -182,6 +183,22 @@ def tarfile_extract(tar_path,
     """
     if not tarfile.is_tarfile(tar_path):
         raise ExtractError("File '%s' is not a tar archive" % tar_path)
+
+    # A blank tar archive with nothing in it counts as a valid tar file
+    # but causes problems later on. Don't allow blank tar archives
+    with tarfile.open(tar_path) as tarf:
+        # next() function should be used for performance reasons instead of
+        # getmembers(). In next() blank tar archive raises Invalid argument
+        # OSError, catching that is interpreted as blank tar archive
+        try:
+            is_blank = False
+            is_blank = not tarf.next()
+        except OSError as exc:
+            if exc.errno != errno.EINVAL:
+                raise
+            is_blank = True
+        if is_blank:
+            raise ExtractError("Blank tar archives are not supported.")
 
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
