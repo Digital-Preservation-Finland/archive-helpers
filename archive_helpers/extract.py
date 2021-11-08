@@ -182,7 +182,7 @@ def tarfile_extract(tar_path,
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
-        raise ExtractError("File '%s' is not a tar archive" % tar_path)
+        raise ExtractError("File is not a tar archive")
 
     # A blank tar archive with nothing in it counts as a valid tar file
     # but causes problems later on. Don't allow blank tar archives
@@ -243,7 +243,7 @@ def zipfile_extract(zip_path,
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
-        raise ExtractError("File '%s' is not a zip archive" % zip_path)
+        raise ExtractError("File is not a zip archive")
 
     with zipfile.ZipFile(zip_path) as zipf:
         if precheck:
@@ -376,4 +376,4 @@ def extract(archive, extract_path, allow_overwrite=False, precheck=True):
                         allow_overwrite=allow_overwrite,
                         precheck=precheck)
     else:
-        raise ExtractError("File '%s' is not supported" % archive)
+        raise ExtractError("File is not supported")
