@@ -262,7 +262,6 @@ def zipfile_extract(zip_path,
                 zipf.extract(member, path=extract_abs_path)
 
 
-
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
     """Check that all files are extracted under extract_path,
     archive contains only regular files and directories, and extracting the
