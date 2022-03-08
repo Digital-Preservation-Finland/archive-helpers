@@ -1,6 +1,7 @@
 DESTDIR ?= /
 PREFIX ?= /usr
 ETC=${DESTDIR}/etc
+PYTHON ?= python3
 
 install:
 	# Cleanup temporary files
@@ -23,12 +24,13 @@ install3:
 	    --record=INSTALLED_FILES
 
 test:
-	py.test  tests -v -m "not gluster" \
+	${PYTHON} -m pytest tests -v -m "not gluster" \
 	    --junitprefix=archives-helper --junitxml=junit.xml
 
 coverage:
-	py.test tests --cov=archive_helpers --cov-report=html
-	coverage report -m
+	${PYTHON} -m pytest tests -m "not gluster" \
+		-svvv --cov=archive_helpers --cov-report=term-missing \
+		--cov-fail-under=80
 	coverage html
 	coverage xml
 
