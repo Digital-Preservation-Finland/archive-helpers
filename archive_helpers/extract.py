@@ -310,8 +310,9 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
         # Support zip archives made with non-POSIX compliant operating
         # systems where file mode is not specified, e.g., windows.
-        supported_type |= (mode == 0)
-        filetype = FILETYPES[stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
+        ifmt = stat.S_IFMT(mode)
+        supported_type |= (ifmt not in FILETYPES)
+        filetype = FILETYPES[ifmt] if ifmt in FILETYPES else "non-POSIX"
 
         return supported_type, filetype
 
