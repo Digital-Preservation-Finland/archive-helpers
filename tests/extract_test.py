@@ -359,3 +359,15 @@ def test_extract_zip_windows(archive, dirs, files, tmpdir):
     for _file in files:
         path = str(tmpdir.join(_file))
         assert os.path.isfile(path)
+
+
+def test_zip_unsupported_compression_type_extract(tmpdir):
+    """Test that extracting a zip archive file with an unsupported
+    compression type raises ExtractError.
+    """
+    with pytest.raises(ExtractError) as error:
+        extract(
+            six.text_type("tests/data/zip_ppmd_compression.zip"),
+            six.text_type(tmpdir)
+        )
+    assert "compression type 98 (ppmd)" in str(error.value)

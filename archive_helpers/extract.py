@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import errno
 import os
+import six
 import stat
 import subprocess
 import tarfile
@@ -245,21 +246,27 @@ def zipfile_extract(zip_path,
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
 
-    with zipfile.ZipFile(zip_path) as zipf:
-        if precheck:
-            _check_archive_members(
-                zipf.infolist(), extract_path,
-                allow_overwrite=allow_overwrite
-            )
-            zipf.extractall(extract_path)
-        else:
-            for member in zipf.infolist():
-                # Read archive only once by extracting files on the fly
-                extract_abs_path = os.path.abspath(extract_path)
-                _validate_member(member,
-                                 extract_path=extract_abs_path,
-                                 allow_overwrite=allow_overwrite)
-                zipf.extract(member, path=extract_abs_path)
+    try:
+        with zipfile.ZipFile(zip_path) as zipf:
+            if precheck:
+                _check_archive_members(
+                    zipf.infolist(), extract_path,
+                    allow_overwrite=allow_overwrite
+                )
+                zipf.extractall(extract_path)
+            else:
+                for member in zipf.infolist():
+                    # Read archive only once by extracting files on the fly
+                    extract_abs_path = os.path.abspath(extract_path)
+                    _validate_member(member,
+                                     extract_path=extract_abs_path,
+                                     allow_overwrite=allow_overwrite)
+                    zipf.extract(member, path=extract_abs_path)
+
+    # Rare compression types like ppmd amd deflate64 that have not been
+    # implemented should raise an ExtractError
+    except NotImplementedError as err:
+        six.raise_from(ExtractError(err), None)
 
 
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
