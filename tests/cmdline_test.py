@@ -1,6 +1,4 @@
 """Test for the command line utils """
-from __future__ import unicode_literals
-
 import pytest
 
 import archive_helpers.extract

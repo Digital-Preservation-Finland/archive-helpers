@@ -1,6 +1,4 @@
 """Command line utility for archive library"""
-from __future__ import unicode_literals
-
 import os
 
 import click

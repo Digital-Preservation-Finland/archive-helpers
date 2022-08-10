@@ -1,8 +1,4 @@
 ---
-
-variables:
-  CI_PYTHON_UNIVERSAL: "yes"
-
 include:
   - project: 'dpres/gitlab-ci-pipeline'
     ref: master

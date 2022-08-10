@@ -1,9 +1,6 @@
 """Extract/decompress various archive formats"""
-from __future__ import unicode_literals
-
 import errno
 import os
-import six
 import stat
 import subprocess
 import tarfile
@@ -266,7 +263,7 @@ def zipfile_extract(zip_path,
     # Rare compression types like ppmd amd deflate64 that have not been
     # implemented should raise an ExtractError
     except NotImplementedError as err:
-        six.raise_from(ExtractError(err), None)
+        raise ExtractError(err) from None
 
 
 def _check_archive_members(archive, extract_path, allow_overwrite=False):
