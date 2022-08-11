@@ -215,11 +215,6 @@ def tarfile_extract(tar_path,
                                  extract_path=extract_abs_path,
                                  allow_overwrite=allow_overwrite)
                 tarf.extract(member, path=extract_abs_path)
-                # Memory caching issue during pre-python3 as mentioned here:
-                # https://stackoverflow.com/a/21092098
-                # The workaround is to reset the members information for the
-                # archive.
-                tarf.members = []
 
 
 def zipfile_extract(zip_path,
