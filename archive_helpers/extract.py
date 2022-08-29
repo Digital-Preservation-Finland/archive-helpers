@@ -27,10 +27,6 @@ TAR_FILE_TYPES = {
     b"7": "CONT"
 }
 
-# A DOS attribute mask for the upper two bytes of a zipfile member's
-# external attributes that are used by unix systems.
-DOS_ATTRIBUTE_MASK = 0xffff
-
 
 def path_to_glfs(source_path, mount_path, glusterfs_host):
     """Convert local path to compatible path with glusterfs coreutils command
@@ -313,15 +309,20 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         mode = member.external_attr >> 16  # Upper two bytes of ext attr
         ifmt = stat.S_IFMT(mode)
 
-        if all((mode != 0,
-                ifmt not in FILETYPES)):
+        if mode != 0 and ifmt not in FILETYPES:
             # Unrecognized modes are probably created by accident on
-            # non-POSIX systems. We'll allow these, but mask the mode
-            # to a DOS atribute when extracting.
-            member.external_attr &= DOS_ATTRIBUTE_MASK
-            # Fetch the mode once again since we've changed the external
-            # attributes
-            mode = member.external_attr >> 16
+            # non-POSIX systems by legacy software.
+            # The upper three bytes are non-MS-DOS external file
+            # attributes (upper two by unix systems), while the lowest
+            # byte is used by MS-DOS.
+            # Standard MS-DOS input should set this field to zero.
+            # Chapter 4.4.15 in (https://pkware.cachefly.net/webdocs/
+            # casestudies/APPNOTE.TXT)
+            # We'll allow files with non standard data in the external
+            # attributes, but we'll mask the mode by zeroing the upper
+            # two bytes used by unix systems.
+            member.external_attr &= 0xffff
+            mode = 0
 
         supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
         # Support zip archives made with non-POSIX compliant operating
