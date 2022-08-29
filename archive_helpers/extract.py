@@ -307,9 +307,8 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         :returns: Tuple of (supported_type, filetype)
         """
         mode = member.external_attr >> 16  # Upper two bytes of ext attr
-        ifmt = stat.S_IFMT(mode)
 
-        if mode != 0 and ifmt not in FILETYPES:
+        if mode != 0 and stat.S_IFMT(mode) not in FILETYPES:
             # Unrecognized modes are probably created by accident on
             # non-POSIX systems by legacy software.
             # The upper three bytes are non-MS-DOS external file
