@@ -353,3 +353,4 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
     """
     extract("tests/data/windows_zip_unrecognized_external_attributes.zip",
             str(tmpdir))
+    assert os.path.isfile(str(tmpdir.join("windows_zip/file.txt")))
