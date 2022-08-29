@@ -345,3 +345,11 @@ def test_zip_unsupported_compression_type_extract(tmpdir):
     with pytest.raises(ExtractError) as error:
         extract("tests/data/zip_ppmd_compression.zip", str(tmpdir))
     assert "compression type 98 (ppmd)" in str(error.value)
+
+
+def test_extract_zip_unrecognized_external_attributes(tmpdir):
+    """Test that zip archives made on windows with unexpected values in
+    the non-MSDOS external file attributes section can be extracted.
+    """
+    extract("tests/data/windows_zip_unrecognized_external_attributes.zip",
+            str(tmpdir))
