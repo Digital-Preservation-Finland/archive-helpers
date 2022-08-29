@@ -27,7 +27,9 @@ TAR_FILE_TYPES = {
     b"7": "CONT"
 }
 
-DOS_ATTRIBUTE_MASK = 0xff
+# A DOS attribute mask for the upper two bytes of a zipfile member's
+# external attributes that are used by unix systems.
+DOS_ATTRIBUTE_MASK = 0xffff
 
 
 def path_to_glfs(source_path, mount_path, glusterfs_host):
@@ -309,12 +311,7 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         :returns: Tuple of (supported_type, filetype)
         """
         mode = member.external_attr >> 16  # Upper two bytes of ext attr
-        supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
-        # Support zip archives made with non-POSIX compliant operating
-        # systems where file mode is not specified, e.g., windows.
         ifmt = stat.S_IFMT(mode)
-        supported_type |= (ifmt not in FILETYPES)
-        filetype = FILETYPES[ifmt] if ifmt in FILETYPES else "non-POSIX"
 
         if all((mode != 0,
                 ifmt not in FILETYPES)):
@@ -322,6 +319,15 @@ def _validate_member(member, extract_path, allow_overwrite=False):
             # non-POSIX systems. We'll allow these, but mask the mode
             # to a DOS atribute when extracting.
             member.external_attr &= DOS_ATTRIBUTE_MASK
+            # Fetch the mode once again since we've changed the external
+            # attributes
+            mode = member.external_attr >> 16
+
+        supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+        # Support zip archives made with non-POSIX compliant operating
+        # systems where file mode is not specified, e.g., windows.
+        supported_type |= (mode == 0)
+        filetype = FILETYPES[stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
 
         return supported_type, filetype
 
