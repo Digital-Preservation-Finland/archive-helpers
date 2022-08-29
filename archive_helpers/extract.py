@@ -27,6 +27,8 @@ TAR_FILE_TYPES = {
     b"7": "CONT"
 }
 
+DOS_ATTRIBUTE_MASK = 0xff
+
 
 def path_to_glfs(source_path, mount_path, glusterfs_host):
     """Convert local path to compatible path with glusterfs coreutils command
@@ -313,6 +315,13 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         ifmt = stat.S_IFMT(mode)
         supported_type |= (ifmt not in FILETYPES)
         filetype = FILETYPES[ifmt] if ifmt in FILETYPES else "non-POSIX"
+
+        if all((mode != 0,
+                ifmt not in FILETYPES)):
+            # Unrecognized modes are probably created by accident on
+            # non-POSIX systems. We'll allow these, but mask the mode
+            # to a DOS atribute when extracting.
+            member.external_attr &= DOS_ATTRIBUTE_MASK
 
         return supported_type, filetype
 
