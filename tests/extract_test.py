@@ -148,6 +148,15 @@ def test_blank_tar_extract(tmpdir):
     assert "Blank tar archives" in str(error.value)
 
 
+def test_abspath_tar_extract(tmpdir):
+    """Test that extracting a tar archive with absolute paths raises
+    MemberNameError.
+    """
+    with pytest.raises(MemberNameError) as error:
+        extract("tests/data/abspath.tar", str(tmpdir))
+    assert "Invalid file path" in str(error.value)
+
+
 def test_zip_extract(tmpdir):
     """Test the zip extract functionality"""
     _zip(tmpdir, "source")
@@ -227,7 +236,7 @@ def test_extract_overwrite(archive, allow_overwrite, tmpdir):
 ])
 def test_extract_relative_paths(path, tmpdir):
     """Test that trying to write files outside the workspace raises
-    MemberNameError
+    MemberNameError.
     """
     path, valid_path = path
 
