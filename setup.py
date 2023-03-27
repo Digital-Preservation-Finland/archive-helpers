@@ -1,7 +1,7 @@
 """Install archive-helpers package"""
 from setuptools import setup, find_packages
 
-from version import get_version
+from archive_helpers import __version__
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
         name='archive-helpers',
         packages=find_packages(exclude=['tests', 'tests.*']),
         include_package_data=True,
-        version=get_version()
+        version=__version__
     )
 
 
