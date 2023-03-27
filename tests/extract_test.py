@@ -24,7 +24,7 @@ ARCHIVES = TAR_FILES + [("source.zip", "")]
 def _tar(tmpdir, fname, dir_to_tar, compression=""):
     """Compress compress_dir to tar file"""
     subprocess.call(
-        ["tar", "c%sf" % compression, fname, "-C", tmpdir, dir_to_tar],
+        ["tar", f"c{compression}f", fname, "-C", tmpdir, dir_to_tar],
         cwd=tmpdir
     )
 
@@ -147,14 +147,14 @@ def test_extract_relative_paths(path, tmpdir):
                 str(tmpdir.join("test.tar")),
                 str(tmpdir.join("destination"))
             )
-        assert str(error.value) == "Invalid file path: '%s'" % path
+        assert str(error.value) == f"Invalid file path: '{path}'"
 
 
 def _tar_absolute_path(tmpdir, fname, compression=""):
     """Create tar archives with absolute paths"""
     archive = str(tmpdir.join(fname))
     command = [
-        "tar", "-c%sf" % compression, archive, "source/file1",
+        "tar", f"-c{compression}f", archive, "source/file1",
         "--transform", "s|source/file1|/file1|"
     ]
     subprocess.call(command, cwd=str(tmpdir))

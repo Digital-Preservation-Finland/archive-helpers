@@ -31,26 +31,22 @@ class ExtractError(Exception):
     """Generic archive extraction error raised when the archive is not
     supported.
     """
-    pass
 
 
 class MemberNameError(Exception):
     """Exception raised when tar or zip files contain members with names
     pointing outside the extraction path.
     """
-    pass
 
 
 class MemberTypeError(Exception):
     """Exception raised when tar or zip files contain members with filetype
     other than REG or DIR.
     """
-    pass
 
 
 class MemberOverwriteError(Exception):
     """Exception raised when extracting the archive would overwrite files."""
-    pass
 
 
 def tarfile_extract(tar_path,
@@ -241,18 +237,16 @@ def _validate_member(member, extract_path, allow_overwrite=False):
 
     # Check if the archive member is valid
     if not fpath.startswith(extract_path):
-        raise MemberNameError(
-            "Invalid file path: '%s'" % filename
+        raise MemberNameError(f"Invalid file path: '{filename}'")
+
+    if not supported_type:
+        raise MemberTypeError(
+            f"File '{filename}' has unsupported type: {filetype}"
         )
-    elif not supported_type:
-        raise MemberTypeError("File '%s' has unsupported type: %s" % (
-            filename, filetype
-        ))
+
     # Do not raise error if overwriting member files is permitted
-    elif not allow_overwrite and os.path.isfile(fpath):
-        raise MemberOverwriteError(
-            "File '%s' already exists" % filename
-        )
+    if not allow_overwrite and os.path.isfile(fpath):
+        raise MemberOverwriteError(f"File '{filename}' already exists")
 
 
 def extract(archive, extract_path, allow_overwrite=False, precheck=True):

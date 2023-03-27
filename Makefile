@@ -14,11 +14,11 @@ install:
 	    --record=INSTALLED_FILES
 
 test:
-	${PYTHON} -m pytest tests -v -m "not gluster" \
+	${PYTHON} -m pytest tests -v \
 	    --junitprefix=archives-helper --junitxml=junit.xml
 
 coverage:
-	${PYTHON} -m pytest tests -m "not gluster" \
+	${PYTHON} -m pytest tests \
 		-svvv --cov=archive_helpers --cov-report=term-missing \
 		--cov-fail-under=80
 	coverage html
