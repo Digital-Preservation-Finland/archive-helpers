@@ -10,8 +10,7 @@ def main():
         name='archive-helpers',
         packages=find_packages(exclude=['tests', 'tests.*']),
         include_package_data=True,
-        version=get_version(),
-        install_requires=["click"],
+        version=get_version()
     )
 
 
