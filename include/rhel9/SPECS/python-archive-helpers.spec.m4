@@ -9,7 +9,7 @@
 %define file_build_number M4_FILE_BUILD_NUMBER
 %define file_commit_ref M4_FILE_COMMIT_REF
 
-Name:           python3-archive-helpers
+Name:           python-archive-helpers
 Version:        %{file_version}
 Release:        %{file_release_number}%{file_release_tag}.%{file_build_number}.git%{file_commit_ref}%{?dist}
 Summary:        Python library for processing various archive formats
@@ -26,9 +26,16 @@ BuildRequires:  %{py3_dist pip}
 BuildRequires:  %{py3_dist setuptools}
 BuildRequires:  %{py3_dist wheel}
 
-%description
+%global _description %{expand:
 Python library for processing various archive formats. Provides common API for
-several archive formats and performance optimized implementations.
+several archive formats and performance optimized implementations.}
+
+%description %_description
+
+%package -n python3-archive-helpers
+Summary:        %{summary}
+
+%description -n python3-archive-helpers %_description
 
 %prep
 %autosetup -n %{file_prefix}-v%{file_version}%{?file_release_tag}-%{file_build_number}-g%{file_commit_ref}
@@ -40,7 +47,7 @@ several archive formats and performance optimized implementations.
 %pyproject_install
 %pyproject_save_files archive_helpers
 
-%files -f %{pyproject_files}
+%files -n python3-archive-helpers -f %{pyproject_files}
 %license LICENSE
 %doc README.rst
 
