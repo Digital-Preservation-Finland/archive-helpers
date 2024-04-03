@@ -34,6 +34,8 @@ several archive formats and performance optimized implementations.}
 
 %package -n python3-archive-helpers
 Summary:        %{summary}
+Requires:       tar
+Requires:       bzip2
 
 %description -n python3-archive-helpers %_description
 
