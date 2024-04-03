@@ -25,6 +25,10 @@ BuildRequires:  pyproject-rpm-macros
 BuildRequires:  %{py3_dist pip}
 BuildRequires:  %{py3_dist setuptools}
 BuildRequires:  %{py3_dist wheel}
+BuildRequires:  tar
+BuildRequires:  bzip2
+BuildRequires:  gzip
+BuildRequires:  zip
 
 %global _description %{expand:
 Python library for processing various archive formats. Provides common API for
@@ -34,8 +38,6 @@ several archive formats and performance optimized implementations.}
 
 %package -n python3-archive-helpers
 Summary:        %{summary}
-Requires:       tar
-Requires:       bzip2
 
 %description -n python3-archive-helpers %_description
 
