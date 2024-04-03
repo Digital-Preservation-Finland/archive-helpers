@@ -1,6 +1,11 @@
 Release notes
 =============
 
+Version 0.14
+------------
+
+- Add missing requirements to spec
+
 Version 0.13
 ------------
 
