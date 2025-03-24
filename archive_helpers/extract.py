@@ -33,6 +33,12 @@ class ExtractError(Exception):
     """
 
 
+class ObjectCountError(Exception):
+    """Generic archive extraction error raised when the archive has too many
+    objects.
+    """
+
+
 class MemberNameError(Exception):
     """Exception raised when tar or zip files contain members with names
     pointing outside the extraction path.
@@ -52,7 +58,8 @@ class MemberOverwriteError(Exception):
 def tarfile_extract(tar_path,
                     extract_path,
                     allow_overwrite=False,
-                    precheck=True):
+                    precheck=True,
+                    max_size=50002):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
@@ -65,6 +72,7 @@ def tarfile_extract(tar_path,
                      once and the members are extracted immediately after the
                      check. User is responsible for the cleanup if member check
                      raises an error with precheck=False.
+    :param max_size: int that defines how many objects can tar file have
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -85,7 +93,7 @@ def tarfile_extract(tar_path,
             is_blank = True
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
-
+    check_tar_size(tar_path, max_size)
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
             _check_archive_members(
@@ -108,7 +116,8 @@ def tarfile_extract(tar_path,
 def zipfile_extract(zip_path,
                     extract_path,
                     allow_overwrite=False,
-                    precheck=True):
+                    precheck=True,
+                    max_size=50002):
     """Decompress using zipfile module.
 
     :param zip_path: Path to the zip archive
@@ -121,11 +130,12 @@ def zipfile_extract(zip_path,
                      once and the members are extracted immediately after the
                      check. User is responsible for the cleanup if member check
                      raises an error with precheck=False.
+    :param max_size: int that defines how many objects can zip file have
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
-
+    check_zip_size(zip_path, max_size)
     try:
         with zipfile.ZipFile(zip_path) as zipf:
             if precheck:
@@ -251,6 +261,50 @@ def _validate_member(member, extract_path, allow_overwrite=False):
     # Do not raise error if overwriting member files is permitted
     if not allow_overwrite and os.path.isfile(fpath):
         raise MemberOverwriteError(f"File '{filename}' already exists")
+
+
+def check_zip_size(archive, max_size):
+    """Check that the zip file does not have too many objects
+    :param archive: path to the zip file
+    :param max_size: max number of objects (50 002)
+    :returns: None
+    """
+    try:
+        with zipfile.ZipFile(archive, "r") as test_file:
+            archive_size = 0
+            names = test_file.namelist()
+            for i in names:
+                if not i.endswith("/"):
+                    archive_size += 1
+            if archive_size > max_size:
+                raise ObjectCountError(f"Archive has too many objects -"
+                                       f" Max size is {max_size} objects")
+    except FileNotFoundError as err:
+        print(f"Invalid file path: {err}")
+    except TypeError as err:
+        print(f"\"%max_size\" variable need to be integer: {err}")
+
+
+def check_tar_size(archive, max_size):
+    """Check that the tar file does not have too many objects
+    :param archive: path to the tar file
+    :param max_size: max number of objects (50 002)
+    :returns: None
+    """
+    try:
+        with tarfile.open(archive, "r") as test_file:
+            archive_size = 0
+            members = test_file.getmembers()
+            for i in members:
+                if i.isfile():
+                    archive_size += 1
+            if archive_size > max_size:
+                raise ObjectCountError(f"Archive has too many objects -"
+                                       f" Max size is {max_size} objects")
+    except FileNotFoundError as err:
+        print(f"Invalid file path: {err}")
+    except TypeError as err:
+        print(f"\"%max_size\" variable need to be integer: {err}")
 
 
 def extract(archive, extract_path, allow_overwrite=False, precheck=True):
