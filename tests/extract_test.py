@@ -6,10 +6,13 @@ import tarfile
 import pytest
 from archive_helpers.extract import (
     ExtractError,
+    ObjectCountError,
     MemberNameError,
     MemberOverwriteError,
     MemberTypeError,
-    extract
+    extract,
+    check_zip_size,
+    check_tar_size
 )
 
 TAR_FILES = [
@@ -259,3 +262,43 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
     extract("tests/data/windows_zip_unrecognized_external_attributes.zip",
             str(tmpdir))
     assert os.path.isfile(str(tmpdir.join("windows_zip/file.txt")))
+
+
+@pytest.mark.parametrize(
+    ("archive", "max_size", "size_ok"),
+    [
+        ("tests/data/zip_three_files.zip", 3, True),
+        ("tests/data/zip_three_files.zip", 2, False),
+        ("tests/data/zip_folder_and_three_files.zip", 3, True),
+        ("tests/data/zip_folder_and_three_files.zip", 2, False),
+    ]
+)
+def test_zip_max_size(archive, max_size, size_ok):
+    """Test that the max object count of the zip file is recognized correctly
+    """
+    if size_ok:
+        check_zip_size(archive, max_size)
+    elif not size_ok:
+        with pytest.raises(ObjectCountError) as error:
+            check_zip_size(archive, max_size)
+        assert "Archive has too many objects" in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("archive", "max_size", "size_ok"),
+    [
+        ("tests/data/tar_three_files.tar", 3, True),
+        ("tests/data/tar_three_files.tar", 2, False),
+        ("tests/data/tar_folder_and_three_files.tar", 3, True),
+        ("tests/data/tar_folder_and_three_files.tar", 2, False),
+    ]
+)
+def test_tar_max_size(archive, max_size, size_ok):
+    """Test that the max object count of the zip file is recognized correctly
+    """
+    if size_ok:
+        check_tar_size(archive, max_size)
+    elif not size_ok:
+        with pytest.raises(ObjectCountError) as error:
+            check_tar_size(archive, max_size)
+        assert "Archive has too many objects" in str(error.value)
