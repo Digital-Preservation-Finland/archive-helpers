@@ -59,7 +59,7 @@ def tarfile_extract(tar_path,
                     extract_path,
                     allow_overwrite=False,
                     precheck=True,
-                    max_size=50002):
+                    max_size=None):
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
@@ -117,7 +117,7 @@ def zipfile_extract(zip_path,
                     extract_path,
                     allow_overwrite=False,
                     precheck=True,
-                    max_size=50002):
+                    max_size=None):
     """Decompress using zipfile module.
 
     :param zip_path: Path to the zip archive
@@ -266,9 +266,11 @@ def _validate_member(member, extract_path, allow_overwrite=False):
 def check_zip_size(archive, max_size):
     """Check that the zip file does not have too many objects
     :param archive: path to the zip file
-    :param max_size: max number of objects (50 002)
+    :param max_size: max number of objects (if None return)
     :returns: None
     """
+    if max_size is None:
+        return
     try:
         with zipfile.ZipFile(archive, "r") as test_file:
             archive_size = 0
@@ -288,9 +290,11 @@ def check_zip_size(archive, max_size):
 def check_tar_size(archive, max_size):
     """Check that the tar file does not have too many objects
     :param archive: path to the tar file
-    :param max_size: max number of objects (50 002)
+    :param max_size: max number of objects (if None skip)
     :returns: None
     """
+    if max_size is None:
+        return
     try:
         with tarfile.open(archive, "r") as test_file:
             archive_size = 0
@@ -307,7 +311,8 @@ def check_tar_size(archive, max_size):
         print(f"\"%max_size\" variable need to be integer: {err}")
 
 
-def extract(archive, extract_path, allow_overwrite=False, precheck=True):
+def extract(archive, extract_path, allow_overwrite=False, precheck=True,
+        max_size=None):
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
 
@@ -327,11 +332,13 @@ def extract(archive, extract_path, allow_overwrite=False, precheck=True):
         tarfile_extract(archive,
                         extract_path,
                         allow_overwrite=allow_overwrite,
-                        precheck=precheck)
+                        precheck=precheck,
+                        max_size=max_size)
     elif zipfile.is_zipfile(archive):
         zipfile_extract(archive,
                         extract_path,
                         allow_overwrite=allow_overwrite,
-                        precheck=precheck)
+                        precheck=precheck,
+                        max_size=max_size)
     else:
         raise ExtractError("File is not supported")

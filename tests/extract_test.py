@@ -269,6 +269,7 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
     [
         ("tests/data/zip_three_files.zip", 3, True),
         ("tests/data/zip_three_files.zip", 2, False),
+        ("tests/data/zip_three_files.zip", None, True),
         ("tests/data/zip_folder_and_three_files.zip", 3, True),
         ("tests/data/zip_folder_and_three_files.zip", 2, False),
     ]
@@ -289,6 +290,7 @@ def test_zip_max_size(archive, max_size, size_ok):
     [
         ("tests/data/tar_three_files.tar", 3, True),
         ("tests/data/tar_three_files.tar", 2, False),
+        ("tests/data/tar_three_files.tar", None, True),
         ("tests/data/tar_folder_and_three_files.tar", 3, True),
         ("tests/data/tar_folder_and_three_files.tar", 2, False),
     ]
