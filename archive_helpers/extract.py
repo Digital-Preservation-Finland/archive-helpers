@@ -93,7 +93,7 @@ def tarfile_extract(tar_path,
             is_blank = True
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
-    check_tar_size(tar_path, max_size)
+        check_tar_size(tarf, max_size)
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
             _check_archive_members(
@@ -135,9 +135,9 @@ def zipfile_extract(zip_path,
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
-    check_zip_size(zip_path, max_size)
     try:
         with zipfile.ZipFile(zip_path) as zipf:
+            check_zip_size(zipf, max_size)
             if precheck:
                 _check_archive_members(
                     zipf.infolist(), extract_path,
@@ -263,56 +263,44 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         raise MemberOverwriteError(f"File '{filename}' already exists")
 
 
-def check_zip_size(archive, max_size):
-    """Check that the zip file does not have too many objects
-    :param archive: path to the zip file
+def check_zip_size(zipf, max_size):
+    """Check that the ZipFile object "zipf" does not have too many objects
+    :param zipf: ZipFile object
+    :param max_size: max number of objects
+    :returns: None
+    """
+    if max_size is None:
+        return
+    archive_size = 0
+    names = zipf.namelist()
+    for i in names:
+        if not i.endswith("/"):
+            archive_size += 1
+        if archive_size > max_size:
+            raise ObjectCountError(f"Archive has too many objects -"
+                                   f" Max size is {max_size} objects")
+
+
+def check_tar_size(tarf, max_size):
+    """Check that the  TarFile object "tarf" does not have too many objects
+    :param tarf: TarFile object
     :param max_size: max number of objects (if None return)
     :returns: None
     """
     if max_size is None:
         return
-    try:
-        with zipfile.ZipFile(archive, "r") as test_file:
-            archive_size = 0
-            names = test_file.namelist()
-            for i in names:
-                if not i.endswith("/"):
-                    archive_size += 1
-            if archive_size > max_size:
-                raise ObjectCountError(f"Archive has too many objects -"
-                                       f" Max size is {max_size} objects")
-    except FileNotFoundError as err:
-        print(f"Invalid file path: {err}")
-    except TypeError as err:
-        print(f"\"%max_size\" variable need to be integer: {err}")
-
-
-def check_tar_size(archive, max_size):
-    """Check that the tar file does not have too many objects
-    :param archive: path to the tar file
-    :param max_size: max number of objects (if None skip)
-    :returns: None
-    """
-    if max_size is None:
-        return
-    try:
-        with tarfile.open(archive, "r") as test_file:
-            archive_size = 0
-            members = test_file.getmembers()
-            for i in members:
-                if i.isfile():
-                    archive_size += 1
-            if archive_size > max_size:
-                raise ObjectCountError(f"Archive has too many objects -"
-                                       f" Max size is {max_size} objects")
-    except FileNotFoundError as err:
-        print(f"Invalid file path: {err}")
-    except TypeError as err:
-        print(f"\"%max_size\" variable need to be integer: {err}")
+    archive_size = 0
+    members = tarf.getmembers()
+    for i in members:
+        if i.isfile():
+            archive_size += 1
+        if archive_size > max_size:
+            raise ObjectCountError(f"Archive has too many objects -"
+                                   f" Max size is {max_size} objects")
 
 
 def extract(archive, extract_path, allow_overwrite=False, precheck=True,
-        max_size=None):
+            max_size=None):
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
 

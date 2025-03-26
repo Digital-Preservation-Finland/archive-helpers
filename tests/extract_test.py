@@ -2,6 +2,7 @@
 import os
 import subprocess
 import tarfile
+import zipfile
 
 import pytest
 from archive_helpers.extract import (
@@ -277,12 +278,13 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
 def test_zip_max_size(archive, max_size, size_ok):
     """Test that the max object count of the zip file is recognized correctly
     """
-    if size_ok:
-        check_zip_size(archive, max_size)
-    elif not size_ok:
-        with pytest.raises(ObjectCountError) as error:
-            check_zip_size(archive, max_size)
-        assert "Archive has too many objects" in str(error.value)
+    with zipfile.ZipFile(archive) as zipf:
+        if size_ok:
+            check_zip_size(zipf, max_size)
+        elif not size_ok:
+            with pytest.raises(ObjectCountError) as error:
+                check_zip_size(zipf, max_size)
+            assert "Archive has too many objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -298,9 +300,10 @@ def test_zip_max_size(archive, max_size, size_ok):
 def test_tar_max_size(archive, max_size, size_ok):
     """Test that the max object count of the zip file is recognized correctly
     """
-    if size_ok:
-        check_tar_size(archive, max_size)
-    elif not size_ok:
-        with pytest.raises(ObjectCountError) as error:
-            check_tar_size(archive, max_size)
-        assert "Archive has too many objects" in str(error.value)
+    with tarfile.open(archive) as tarf:
+        if size_ok:
+            check_tar_size(tarf, max_size)
+        elif not size_ok:
+            with pytest.raises(ObjectCountError) as error:
+                check_tar_size(tarf, max_size)
+            assert "Archive has too many objects" in str(error.value)
