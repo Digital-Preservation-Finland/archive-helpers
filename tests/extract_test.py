@@ -12,8 +12,6 @@ from archive_helpers.extract import (
     MemberOverwriteError,
     MemberTypeError,
     extract,
-    check_zip_size,
-    check_tar_size
 )
 
 TAR_FILES = [
@@ -266,44 +264,52 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
 
 
 @pytest.mark.parametrize(
-    ("archive", "max_size", "size_ok"),
+    ("archive", "max_size", "precheck", "size_ok"),
     [
-        ("tests/data/zip_three_files.zip", 3, True),
-        ("tests/data/zip_three_files.zip", 2, False),
-        ("tests/data/zip_three_files.zip", None, True),
-        ("tests/data/zip_folder_and_three_files.zip", 3, True),
-        ("tests/data/zip_folder_and_three_files.zip", 2, False),
+        ("tests/data/zip_three_files.zip", 3, True, True),
+        ("tests/data/zip_three_files.zip", 2, True, False),
+        ("tests/data/zip_three_files.zip", None, True, True),
+        ("tests/data/zip_folder_and_three_files.zip", 3, True, True),
+        ("tests/data/zip_folder_and_three_files.zip", 2, True, False),
+        ("tests/data/zip_three_files.zip", 3, False, True),
+        ("tests/data/zip_three_files.zip", 2, False, False),
+        ("tests/data/zip_three_files.zip", None, False, True),
+        ("tests/data/zip_folder_and_three_files.zip", 3, False, True),
+        ("tests/data/zip_folder_and_three_files.zip", 2, False, False),
     ]
 )
-def test_zip_max_size(archive, max_size, size_ok):
+def test_zip_max_size(size_ok, archive, tmp_path, precheck, max_size):
     """Test that the max object count of the zip file is recognized correctly
     """
-    with zipfile.ZipFile(archive) as zipf:
-        if size_ok:
-            check_zip_size(zipf, max_size)
-        elif not size_ok:
-            with pytest.raises(ObjectCountError) as error:
-                check_zip_size(zipf, max_size)
-            assert "Archive has too many objects" in str(error.value)
+    if size_ok:
+        extract(archive, tmp_path, True, precheck, max_size)
+    elif not size_ok:
+        with pytest.raises(ObjectCountError) as error:
+            extract(archive, tmp_path, True, precheck, max_size)
+        assert "Archive has too many objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
-    ("archive", "max_size", "size_ok"),
+    ("archive", "max_size", "precheck", "size_ok"),
     [
-        ("tests/data/tar_three_files.tar", 3, True),
-        ("tests/data/tar_three_files.tar", 2, False),
-        ("tests/data/tar_three_files.tar", None, True),
-        ("tests/data/tar_folder_and_three_files.tar", 3, True),
-        ("tests/data/tar_folder_and_three_files.tar", 2, False),
+        ("tests/data/tar_three_files.tar", 3, True, True),
+        ("tests/data/tar_three_files.tar", 2, True, False),
+        ("tests/data/tar_three_files.tar", None, True, True),
+        ("tests/data/tar_folder_and_three_files.tar", 3, True, True),
+        ("tests/data/tar_folder_and_three_files.tar", 2, True, False),
+        ("tests/data/tar_three_files.tar", 3, False, True),
+        ("tests/data/tar_three_files.tar", 2, False, False),
+        ("tests/data/tar_three_files.tar", None, False, True),
+        ("tests/data/tar_folder_and_three_files.tar", 3, False, True),
+        ("tests/data/tar_folder_and_three_files.tar", 2, False, False),
     ]
 )
-def test_tar_max_size(archive, max_size, size_ok):
-    """Test that the max object count of the zip file is recognized correctly
+def test_tar_max_size(size_ok, archive, tmp_path, precheck, max_size):
+    """Test that the max object count of the tar file is recognized correctly
     """
-    with tarfile.open(archive) as tarf:
-        if size_ok:
-            check_tar_size(tarf, max_size)
-        elif not size_ok:
-            with pytest.raises(ObjectCountError) as error:
-                check_tar_size(tarf, max_size)
-            assert "Archive has too many objects" in str(error.value)
+    if size_ok:
+        extract(archive, tmp_path, True, precheck, max_size)
+    elif not size_ok:
+        with pytest.raises(ObjectCountError) as error:
+            extract(archive, tmp_path, True, precheck, max_size)
+        assert "Archive has too many objects" in str(error.value)

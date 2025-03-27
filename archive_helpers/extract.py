@@ -72,7 +72,7 @@ def tarfile_extract(tar_path,
                      once and the members are extracted immediately after the
                      check. User is responsible for the cleanup if member check
                      raises an error with precheck=False.
-    :param max_size: int that defines how many objects can tar file have
+    :param max_size: Int that defines how many objects can tar file have
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -93,12 +93,12 @@ def tarfile_extract(tar_path,
             is_blank = True
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
-        check_tar_size(tarf, max_size)
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
             _check_archive_members(
                 tarf, extract_path,
-                allow_overwrite=allow_overwrite
+                allow_overwrite=allow_overwrite,
+                max_size=max_size,
             )
         with tarfile.open(tar_path, 'r|*') as tarf:
             tarf.extractall(extract_path)
@@ -106,7 +106,16 @@ def tarfile_extract(tar_path,
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
         with tarfile.open(tar_path, 'r|*') as tarf:
+            archive_size = 0
             for member in tarf:
+                if max_size is not None:
+                    if member.isfile():
+                        archive_size += 1
+                    if archive_size > max_size:
+                        raise ObjectCountError(
+                                "Archive has too many objects -"
+                                f" Max size is {max_size} objects"
+                        )
                 _validate_member(member,
                                  extract_path=extract_abs_path,
                                  allow_overwrite=allow_overwrite)
@@ -130,22 +139,31 @@ def zipfile_extract(zip_path,
                      once and the members are extracted immediately after the
                      check. User is responsible for the cleanup if member check
                      raises an error with precheck=False.
-    :param max_size: int that defines how many objects can zip file have
+    :param max_size: Int that defines how many objects can zip file have
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
     try:
         with zipfile.ZipFile(zip_path) as zipf:
-            check_zip_size(zipf, max_size)
             if precheck:
                 _check_archive_members(
                     zipf.infolist(), extract_path,
-                    allow_overwrite=allow_overwrite
+                    allow_overwrite=allow_overwrite,
+                    max_size=max_size,
                 )
                 zipf.extractall(extract_path)
             else:
+                archive_size = 0
                 for member in zipf.infolist():
+                    if max_size is not None:
+                        if not member.is_dir():
+                            archive_size += 1
+                        if archive_size > max_size:
+                            raise ObjectCountError(
+                                    "Archive has too many objects -"
+                                    f" Max size is {max_size} objects"
+                            )
                     # Read archive only once by extracting files on the fly
                     extract_abs_path = os.path.abspath(extract_path)
                     _validate_member(member,
@@ -163,7 +181,8 @@ def zipfile_extract(zip_path,
         raise ExtractError("Compression type not supported.") from error
 
 
-def _check_archive_members(archive, extract_path, allow_overwrite=False):
+def _check_archive_members(archive, extract_path, allow_overwrite=False,
+                           max_size=None):
     """Check that all files are extracted under extract_path,
     archive contains only regular files and directories, and extracting the
     archive does not overwrite anything.
@@ -172,14 +191,27 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False):
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
                             without raising an error (defaults to False)
+    :param max_size: Int that defines how many objects can archive have
+                     ("None" skip object counting)
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
+    archive_size = 0
 
     for member in archive:
         _validate_member(member=member,
                          extract_path=extract_path,
                          allow_overwrite=allow_overwrite)
+        if max_size is not None:
+            if isinstance(archive, tarfile.TarFile):
+                if member.isfile():
+                    archive_size += 1
+            else:
+                if not member.is_dir():
+                    archive_size += 1
+            if archive_size > max_size:
+                raise ObjectCountError("Archive has too many objects -"
+                                       f" Max size is {max_size} objects")
 
 
 def _validate_member(member, extract_path, allow_overwrite=False):
@@ -261,42 +293,6 @@ def _validate_member(member, extract_path, allow_overwrite=False):
     # Do not raise error if overwriting member files is permitted
     if not allow_overwrite and os.path.isfile(fpath):
         raise MemberOverwriteError(f"File '{filename}' already exists")
-
-
-def check_zip_size(zipf, max_size):
-    """Check that the ZipFile object "zipf" does not have too many objects
-    :param zipf: ZipFile object
-    :param max_size: max number of objects
-    :returns: None
-    """
-    if max_size is None:
-        return
-    archive_size = 0
-    names = zipf.namelist()
-    for i in names:
-        if not i.endswith("/"):
-            archive_size += 1
-        if archive_size > max_size:
-            raise ObjectCountError(f"Archive has too many objects -"
-                                   f" Max size is {max_size} objects")
-
-
-def check_tar_size(tarf, max_size):
-    """Check that the  TarFile object "tarf" does not have too many objects
-    :param tarf: TarFile object
-    :param max_size: max number of objects (if None return)
-    :returns: None
-    """
-    if max_size is None:
-        return
-    archive_size = 0
-    members = tarf.getmembers()
-    for i in members:
-        if i.isfile():
-            archive_size += 1
-        if archive_size > max_size:
-            raise ObjectCountError(f"Archive has too many objects -"
-                                   f" Max size is {max_size} objects")
 
 
 def extract(archive, extract_path, allow_overwrite=False, precheck=True,
