@@ -1,6 +1,11 @@
 Release notes
 =============
 
+Unreleased
+----------
+
+- Add setting for maximum allowed objects in an archive 
+
 Version 0.14
 ------------
 
