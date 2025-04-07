@@ -101,7 +101,10 @@ def tarfile_extract(tar_path,
                 max_size=max_size,
             )
         with tarfile.open(tar_path, 'r|*') as tarf:
-            tarf.extractall(extract_path)
+            try:
+                tarf.extractall(extract_path, filter="fully_trusted")
+            except TypeError:  # 'filer' does not exist
+                tarf.extractall(extract_path)
     else:
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
@@ -119,7 +122,14 @@ def tarfile_extract(tar_path,
                 _validate_member(member,
                                  extract_path=extract_abs_path,
                                  allow_overwrite=allow_overwrite)
-                tarf.extract(member, path=extract_abs_path)
+                try:
+                    tarf.extract(
+                            member,
+                            path=extract_abs_path,
+                            filter="fully_trusted",
+                        )
+                except TypeError:  # 'filter' does not exist
+                    tarf.extract(member, path=extract_abs_path)
 
 
 def zipfile_extract(zip_path,
