@@ -1,4 +1,6 @@
 """Extract/decompress various archive formats"""
+from __future__ import annotations
+
 import errno
 import os
 import stat
@@ -55,24 +57,26 @@ class MemberOverwriteError(Exception):
     """Exception raised when extracting the archive would overwrite files."""
 
 
-def tarfile_extract(tar_path,
-                    extract_path,
-                    allow_overwrite=False,
-                    precheck=True,
-                    max_size=None):
+def tarfile_extract(
+        tar_path: str | bytes | os.PathLike,
+        extract_path: str | bytes | os.PathLike,
+        allow_overwrite: bool = False,
+        precheck: bool = True,
+        max_objects: int | None = None
+) -> None:
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False)
+        without raising an error (defaults to False)
     :param precheck: Boolean that defines whether to check to whole archive
-                     before extraction or not. If True, user does not need to
-                     worry about the cleanup. If False, archive is read only
-                     once and the members are extracted immediately after the
-                     check. User is responsible for the cleanup if member check
-                     raises an error with precheck=False.
-    :param max_size: Int that defines how many objects can tar file have
+        before extraction or not. If True, user does not need to worry about
+        the cleanup. If False, archive is read only once and the members are
+        extracted immediately after the check. User is responsible for the
+        cleanup if member check raises an error with `precheck=False`.
+    :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit.
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -98,7 +102,7 @@ def tarfile_extract(tar_path,
             _check_archive_members(
                 tarf, extract_path,
                 allow_overwrite=allow_overwrite,
-                max_size=max_size,
+                max_objects=max_objects,
             )
         with tarfile.open(tar_path, 'r|*') as tarf:
             try:
@@ -111,13 +115,13 @@ def tarfile_extract(tar_path,
         with tarfile.open(tar_path, 'r|*') as tarf:
             archive_size = 0
             for member in tarf:
-                if max_size is not None:
+                if max_objects is not None:
                     if member.isfile():
                         archive_size += 1
-                    if archive_size > max_size:
+                    if archive_size > max_objects:
                         raise ObjectCountError(
                                 "Archive has too many objects -"
-                                f" Max size is {max_size} objects"
+                                f" Max size is {max_objects} objects"
                         )
                 _validate_member(member,
                                  extract_path=extract_abs_path,
@@ -132,24 +136,26 @@ def tarfile_extract(tar_path,
                     tarf.extract(member, path=extract_abs_path)
 
 
-def zipfile_extract(zip_path,
-                    extract_path,
-                    allow_overwrite=False,
-                    precheck=True,
-                    max_size=None):
+def zipfile_extract(
+        zip_path: str | bytes | os.PathLike,
+        extract_path: str | bytes | os.PathLike,
+        allow_overwrite: bool = False,
+        precheck: bool = True,
+        max_objects: int | None = None
+) -> None:
     """Decompress using zipfile module.
 
     :param zip_path: Path to the zip archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False)
+        without raising an error (defaults to False)
     :param precheck: Boolean that defines whether to check to whole archive
-                     before extraction or not. If True, user does not need to
-                     worry about the cleanup. If False, archive is read only
-                     once and the members are extracted immediately after the
-                     check. User is responsible for the cleanup if member check
-                     raises an error with precheck=False.
-    :param max_size: Int that defines how many objects can zip file have
+        before extraction or not. If True, user does not need to worry about
+        the cleanup. If False, archive is read only once and the members are
+        extracted immediately after the check. User is responsible for the
+        cleanup if member check raises an error with `precheck=False`.
+    :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit.
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
@@ -160,19 +166,19 @@ def zipfile_extract(zip_path,
                 _check_archive_members(
                     zipf.infolist(), extract_path,
                     allow_overwrite=allow_overwrite,
-                    max_size=max_size,
+                    max_objects=max_objects,
                 )
                 zipf.extractall(extract_path)
             else:
                 archive_size = 0
                 for member in zipf.infolist():
-                    if max_size is not None:
+                    if max_objects is not None:
                         if not member.is_dir():
                             archive_size += 1
-                        if archive_size > max_size:
+                        if archive_size > max_objects:
                             raise ObjectCountError(
                                     "Archive has too many objects -"
-                                    f" Max size is {max_size} objects"
+                                    f" Max size is {max_objects} objects"
                             )
                     # Read archive only once by extracting files on the fly
                     extract_abs_path = os.path.abspath(extract_path)
@@ -191,8 +197,12 @@ def zipfile_extract(zip_path,
         raise ExtractError("Compression type not supported.") from error
 
 
-def _check_archive_members(archive, extract_path, allow_overwrite=False,
-                           max_size=None):
+def _check_archive_members(
+        archive: tarfile.TarFile | zipfile.ZipFile,
+        extract_path: str | bytes | os.PathLike,
+        allow_overwrite: bool = False,
+        max_objects: int | None = None
+) -> None:
     """Check that all files are extracted under extract_path,
     archive contains only regular files and directories, and extracting the
     archive does not overwrite anything.
@@ -200,9 +210,10 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False,
     :param archive: Opened ZipFile or TarFile
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False)
-    :param max_size: Int that defines how many objects can archive have
-                     ("None" skip object counting)
+        without raising an error (defaults to False)
+    :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit.
+    :raises ObjectCountError: If archive has too many objects.
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
@@ -212,40 +223,44 @@ def _check_archive_members(archive, extract_path, allow_overwrite=False,
         _validate_member(member=member,
                          extract_path=extract_path,
                          allow_overwrite=allow_overwrite)
-        if max_size is not None:
-            if isinstance(archive, tarfile.TarFile):
-                if member.isfile():
-                    archive_size += 1
-            else:
-                if not member.is_dir():
-                    archive_size += 1
-            if archive_size > max_size:
-                raise ObjectCountError("Archive has too many objects -"
-                                       f" Max size is {max_size} objects")
+        if max_objects is None:
+            continue
+
+        if (isinstance(member, tarfile.TarInfo) and member.isfile() or
+                isinstance(member, zipfile.ZipInfo) and not member.is_dir()):
+            archive_size += 1
+
+        if archive_size > max_objects:
+            raise ObjectCountError("Archive has too many objects -"
+                                   f" Max size is {max_objects} objects")
 
 
-def _validate_member(member, extract_path, allow_overwrite=False):
+def _validate_member(
+        member: tarfile.TarInfo | zipfile.ZipInfo,
+        extract_path: str | bytes | os.PathLike,
+        allow_overwrite: bool = False
+) -> None:
     """Validates that there are no issues with given member.
 
     :param member: ZipInfo or TarInfo member.
     :param extract_path: Directory where the archive is extracted to
     :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False).
-    :raises: MemberNameError is raised when filename is invalid for the member.
-    :raises: MemberTypeError is raised when the member is of unsupported
+        without raising an error (defaults to False).
+    :raises MemberNameError: is raised when filename is invalid for the member.
+    :raises MemberTypeError: is raised when the member is of unsupported
         filetype.
-    :raises: MemberOverwriteError If an existing file was discovered in the
+    :raises MemberOverwriteError: If an existing file was discovered in the
         extract patch.
     """
 
-    def _tar_filetype_evaluation():
+    def _tar_filetype_evaluation() -> tuple[bool, str]:
         """Inner function to set the supported_type and file_type variables
         for zip files.
         :returns: Tuple of (supported_type, filetype)
         """
         return member.isfile() or member.isdir(), TAR_FILE_TYPES[member.type]
 
-    def _zip_filetype_evaluation():
+    def _zip_filetype_evaluation() -> tuple[bool, str]:
         """Inner function to set the supported_type and file_type variables
         for tar files.
         :returns: Tuple of (supported_type, filetype)
@@ -305,21 +320,28 @@ def _validate_member(member, extract_path, allow_overwrite=False):
         raise MemberOverwriteError(f"File '{filename}' already exists")
 
 
-def extract(archive, extract_path, allow_overwrite=False, precheck=True,
-            max_size=None):
+def extract(
+        archive: str | bytes | os.PathLike,
+        extract_path: str | bytes | os.PathLike,
+        allow_overwrite: bool = False,
+        precheck: bool = True,
+        max_objects: bool | None = None
+) -> None:
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
 
-    :param tar_path: Path to the tar archive
+    :param archive: Path to the tar or zip archive
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
-                            without raising an error (defaults to False)
+        without raising an error (defaults to False)
     :param precheck: Boolean that defines whether to check to whole archive
-                     before extraction or not. If True, user does not need to
-                     worry about the cleanup. If False, archive is read only
-                     once and the members are extracted immediately after the
-                     check. User is responsible for the cleanup if member check
-                     raises an error with precheck=False.
+        before extraction or not. If True, user does not need to worry about
+        the cleanup. If False, archive is read only once and the members are
+        extracted immediately after the check. User is responsible for the
+        cleanup if member check raises an error with precheck=False.
+    :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit.
+    :raises ExtractError: If extracting file is not supported.
     :returns: None
     """
     if tarfile.is_tarfile(archive):
@@ -327,12 +349,12 @@ def extract(archive, extract_path, allow_overwrite=False, precheck=True,
                         extract_path,
                         allow_overwrite=allow_overwrite,
                         precheck=precheck,
-                        max_size=max_size)
+                        max_objects=max_objects)
     elif zipfile.is_zipfile(archive):
         zipfile_extract(archive,
                         extract_path,
                         allow_overwrite=allow_overwrite,
                         precheck=precheck,
-                        max_size=max_size)
+                        max_objects=max_objects)
     else:
         raise ExtractError("File is not supported")
