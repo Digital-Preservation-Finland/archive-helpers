@@ -210,8 +210,9 @@ def _check_archive_members(
         max_objects: int | None = None
 ) -> None:
     """Check that all files are extracted under extract_path,
-    archive contains only regular files and directories, and extracting the
-    archive does not overwrite anything.
+    archive contains only regular files and directories, extracting the
+    archive does not overwrite anything, and that the compression ratio is not
+    suspicious.
 
     :param archive: Opened ZipFile or TarFile
     :param extract_path: Directory where the archive is extracted
@@ -220,10 +221,24 @@ def _check_archive_members(
     :param max_objects: Limit how many objects the tar file can have. Use
         `None` for no limit.
     :raises ObjectCountError: If archive has too many objects.
+    :raises SuspiciousArchiveError: If archive has suspicious compression ratio
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
     archive_objects = 0
+    uncompressed_size = 0
+    compressed_size = os.path.getsize(extract_path)
+
+    if isinstance(archive, tarfile.TarFile):
+        uncompressed_size = sum(m.size for m in archive.getmembers())
+    if isinstance(archive, zipfile.ZipFile):
+        uncompressed_size = sum(m.file_size for m in archive.infolist())
+
+    if compressed_size > 0:
+        ratio = uncompressed_size / compressed_size
+        if ratio > RATIO_THRESHOLD:
+            raise SuspiciousArchiveError(f"Archive '{archive}' has suspicious "
+                                         f"compression ratio: {ratio:.2f}")
 
     for member in archive:
         _validate_member(member=member,
@@ -232,8 +247,8 @@ def _check_archive_members(
         if max_objects is None:
             continue
 
-        if (isinstance(member, tarfile.TarInfo) and member.isfile() or
-                isinstance(member, zipfile.ZipInfo) and not member.is_dir()):
+        if ((isinstance(member, tarfile.TarInfo) and member.isfile()) or
+                (isinstance(member, zipfile.ZipInfo) and not member.is_dir())):
             archive_objects += 1
 
         if archive_objects > max_objects:
@@ -332,7 +347,7 @@ def _validate_member(
         ratio = member.file_size / member.compress_size
         if ratio > RATIO_THRESHOLD:
             raise SuspiciousArchiveError(f"File '{filename}' has suspicious "
-                                         f"compression ratio: {ratio}")
+                                         f"compression ratio: {ratio:.2f}")
 
 
 def extract(
