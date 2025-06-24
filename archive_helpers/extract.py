@@ -29,6 +29,7 @@ TAR_FILE_TYPES = {
 }
 
 RATIO_THRESHOLD = 100
+SIZE_THRESHOLD = 100000000000000  # 100 GB
 
 
 class ExtractError(Exception):
@@ -106,7 +107,9 @@ def tarfile_extract(
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
             _check_archive_members(
-                tarf, extract_path,
+                archive=tarf,
+                archive_path=tar_path,
+                extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
             )
@@ -170,7 +173,9 @@ def zipfile_extract(
         with zipfile.ZipFile(zip_path) as zipf:
             if precheck:
                 _check_archive_members(
-                    zipf.infolist(), extract_path,
+                    archive=zipf.infolist(),
+                    archive_path=zip_path,
+                    extract_path=extract_path,
                     allow_overwrite=allow_overwrite,
                     max_objects=max_objects,
                 )
@@ -205,6 +210,7 @@ def zipfile_extract(
 
 def _check_archive_members(
         archive: tarfile.TarFile | zipfile.ZipFile,
+        archive_path: str | bytes | os.PathLike,
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         max_objects: int | None = None
@@ -221,18 +227,23 @@ def _check_archive_members(
     :param max_objects: Limit how many objects the tar file can have. Use
         `None` for no limit.
     :raises ObjectCountError: If archive has too many objects.
-    :raises SuspiciousArchiveError: If archive has suspicious compression ratio
+    :raises SuspiciousArchiveError: If archive has suspicious compression
+        ratio, or uncompressed size is too large
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
     archive_objects = 0
     uncompressed_size = 0
-    compressed_size = os.path.getsize(extract_path)
+    compressed_size = os.path.getsize(archive_path)
 
     if isinstance(archive, tarfile.TarFile):
         uncompressed_size = sum(m.size for m in archive.getmembers())
     if isinstance(archive, zipfile.ZipFile):
         uncompressed_size = sum(m.file_size for m in archive.infolist())
+
+    if uncompressed_size > SIZE_THRESHOLD:
+        raise SuspiciousArchiveError(f"Archive '{archive}' has suspicious "
+                                     f"uncompressed size: {uncompressed_size}")
 
     if compressed_size > 0:
         ratio = uncompressed_size / compressed_size
