@@ -61,7 +61,9 @@ class MemberOverwriteError(Exception):
 
 
 class SuspiciousArchiveError(Exception):
-    """Exception raised when the archive has a suspicious compression ratio"""
+    """Exception raised when the archive has a suspicious compression ratio, or
+    uncompressed size is too large
+    """
 
 
 def tarfile_extract(
@@ -173,7 +175,7 @@ def zipfile_extract(
         with zipfile.ZipFile(zip_path) as zipf:
             if precheck:
                 _check_archive_members(
-                    archive=zipf.infolist(),
+                    archive=zipf,
                     archive_path=zip_path,
                     extract_path=extract_path,
                     allow_overwrite=allow_overwrite,
@@ -220,7 +222,7 @@ def _check_archive_members(
     archive does not overwrite anything, and that the compression ratio is not
     suspicious.
 
-    :param archive: Opened ZipFile or TarFile
+    :param archive: Opened TarFile or list of containing ZipInfo objects
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
         without raising an error (defaults to False)
@@ -239,17 +241,20 @@ def _check_archive_members(
     if isinstance(archive, tarfile.TarFile):
         uncompressed_size = sum(m.size for m in archive.getmembers())
     if isinstance(archive, zipfile.ZipFile):
-        uncompressed_size = sum(m.file_size for m in archive.infolist())
+        archive = archive.infolist()
+        uncompressed_size = sum(m.file_size for m in archive)
 
     if uncompressed_size > SIZE_THRESHOLD:
-        raise SuspiciousArchiveError(f"Archive '{archive}' has suspicious "
-                                     f"uncompressed size: {uncompressed_size}")
+        raise SuspiciousArchiveError(
+            f"Archive {archive_path} has suspicious uncompressed size: "
+            f"{uncompressed_size} > {SIZE_THRESHOLD}")
 
     if compressed_size > 0:
         ratio = uncompressed_size / compressed_size
         if ratio > RATIO_THRESHOLD:
-            raise SuspiciousArchiveError(f"Archive '{archive}' has suspicious "
-                                         f"compression ratio: {ratio:.2f}")
+            raise SuspiciousArchiveError(
+                f"Archive '{archive_path}' has suspicious compression ratio: "
+                f"{ratio:.2f} > {RATIO_THRESHOLD}")
 
     for member in archive:
         _validate_member(member=member,
@@ -263,8 +268,9 @@ def _check_archive_members(
             archive_objects += 1
 
         if archive_objects > max_objects:
-            raise ObjectCountError("Archive has too many objects: "
-                                   f"{archive_objects} > {max_objects}")
+            raise ObjectCountError(
+                f"Archive '{archive_path}' has too many objects: "
+                f"{archive_objects} > {max_objects}")
 
 
 def _validate_member(
@@ -354,6 +360,7 @@ def _validate_member(
         raise MemberOverwriteError(f"File '{filename}' already exists")
 
     # Check that the compression ratio is not suspicious
+    # Only zip for now, tarfile has no methods for uncompressed member size
     if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0:
         ratio = member.file_size / member.compress_size
         if ratio > RATIO_THRESHOLD:
