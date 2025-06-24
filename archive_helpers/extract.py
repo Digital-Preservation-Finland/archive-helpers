@@ -28,6 +28,8 @@ TAR_FILE_TYPES = {
     b"7": "CONT"
 }
 
+RATIO_THRESHOLD = 100
+
 
 class ExtractError(Exception):
     """Generic archive extraction error raised when the archive is not
@@ -55,6 +57,10 @@ class MemberTypeError(Exception):
 
 class MemberOverwriteError(Exception):
     """Exception raised when extracting the archive would overwrite files."""
+
+
+class SuspiciousArchiveError(Exception):
+    """Exception raised when the archive has a suspicious compression ratio"""
 
 
 def tarfile_extract(
@@ -217,7 +223,7 @@ def _check_archive_members(
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
-    archive_size = 0
+    archive_objects = 0
 
     for member in archive:
         _validate_member(member=member,
@@ -228,11 +234,11 @@ def _check_archive_members(
 
         if (isinstance(member, tarfile.TarInfo) and member.isfile() or
                 isinstance(member, zipfile.ZipInfo) and not member.is_dir()):
-            archive_size += 1
+            archive_objects += 1
 
-        if archive_size > max_objects:
-            raise ObjectCountError("Archive has too many objects -"
-                                   f" Max size is {max_objects} objects")
+        if archive_objects > max_objects:
+            raise ObjectCountError("Archive has too many objects: "
+                                   f"{archive_objects} > {max_objects}")
 
 
 def _validate_member(
@@ -251,6 +257,8 @@ def _validate_member(
         filetype.
     :raises MemberOverwriteError: If an existing file was discovered in the
         extract patch.
+    :raises SuspiciousArchiveError: If any file has a suspicous compression
+        ratio.
     """
 
     def _tar_filetype_evaluation() -> tuple[bool, str]:
@@ -319,13 +327,20 @@ def _validate_member(
     if not allow_overwrite and os.path.isfile(fpath):
         raise MemberOverwriteError(f"File '{filename}' already exists")
 
+    # Check that the compression ratio is not suspicious
+    if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0:
+        ratio = member.file_size / member.compress_size
+        if ratio > RATIO_THRESHOLD:
+            raise SuspiciousArchiveError(f"File '{filename}' has suspicious "
+                                         f"compression ratio: {ratio}")
+
 
 def extract(
         archive: str | bytes | os.PathLike,
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: bool | None = None
+        max_objects: bool | None = None,
 ) -> None:
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.

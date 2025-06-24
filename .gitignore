@@ -35,3 +35,4 @@ venv*/
 .venv
 archive.tar
 tmp
+tags

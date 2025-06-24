@@ -2,7 +2,6 @@
 import os
 import subprocess
 import tarfile
-import zipfile
 
 import pytest
 from archive_helpers.extract import (
@@ -11,6 +10,7 @@ from archive_helpers.extract import (
     MemberNameError,
     MemberOverwriteError,
     MemberTypeError,
+    SuspiciousArchiveError,
     extract,
 )
 
@@ -264,7 +264,7 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
 
 
 @pytest.mark.parametrize(
-    ("archive", "max_size", "precheck", "size_ok"),
+    ("archive", "max_objects", "precheck", "size_ok"),
     [
         ("tests/data/zip_three_files.zip", 3, True, True),
         ("tests/data/zip_three_files.zip", 2, True, False),
@@ -278,19 +278,19 @@ def test_extract_zip_unrecognized_external_attributes(tmpdir):
         ("tests/data/zip_folder_and_three_files.zip", 2, False, False),
     ]
 )
-def test_zip_max_size(size_ok, archive, tmp_path, precheck, max_size):
+def test_zip_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     """Test that the max object count of the zip file is recognized correctly
     """
     if size_ok:
-        extract(archive, tmp_path, True, precheck, max_size)
+        extract(archive, tmp_path, True, precheck, max_objects)
     elif not size_ok:
         with pytest.raises(ObjectCountError) as error:
-            extract(archive, tmp_path, True, precheck, max_size)
+            extract(archive, tmp_path, True, precheck, max_objects)
         assert "Archive has too many objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
-    ("archive", "max_size", "precheck", "size_ok"),
+    ("archive", "max_objects", "precheck", "size_ok"),
     [
         ("tests/data/tar_three_files.tar", 3, True, True),
         ("tests/data/tar_three_files.tar", 2, True, False),
@@ -304,12 +304,19 @@ def test_zip_max_size(size_ok, archive, tmp_path, precheck, max_size):
         ("tests/data/tar_folder_and_three_files.tar", 2, False, False),
     ]
 )
-def test_tar_max_size(size_ok, archive, tmp_path, precheck, max_size):
+def test_tar_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     """Test that the max object count of the tar file is recognized correctly
     """
     if size_ok:
-        extract(archive, tmp_path, True, precheck, max_size)
+        extract(archive, tmp_path, True, precheck, max_objects)
     elif not size_ok:
         with pytest.raises(ObjectCountError) as error:
-            extract(archive, tmp_path, True, precheck, max_size)
+            extract(archive, tmp_path, True, precheck, max_objects)
         assert "Archive has too many objects" in str(error.value)
+
+
+def test_zip_bomb_is_detected(tmp_path):
+    """Test that zip bombs are detected"""
+    with pytest.raises(SuspiciousArchiveError) as error:
+        extract("tests/data/zip_bomb_220MB.zip", tmp_path, True, True, None)
+    assert "suspicious compression ratio" in str(error.value)
