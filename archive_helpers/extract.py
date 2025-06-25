@@ -71,7 +71,9 @@ def tarfile_extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: int | None = None
+        max_objects: int | None = None,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
     """Decompress using tarfile module.
 
@@ -86,6 +88,11 @@ def tarfile_extract(
         cleanup if member check raises an error with `precheck=False`.
     :param max_objects: Limit how many objects the tar file can have. Use
         `None` for no limit.
+    :param max_size: Limit how large the decompressed archive can be. Use
+        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+    :param max_ratio: Limit the archive's compression ratio. This is *only*
+        checked for the entire archive. Use `None` for no limit. Default limit
+        is 100.
     :returns: None
     """
     if not tarfile.is_tarfile(tar_path):
@@ -114,6 +121,8 @@ def tarfile_extract(
                 extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
+                max_size=max_size,
+                max_ratio=max_ratio
             )
         with tarfile.open(tar_path, 'r|*') as tarf:
             try:
@@ -124,19 +133,40 @@ def tarfile_extract(
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
         with tarfile.open(tar_path, 'r|*') as tarf:
-            archive_size = 0
+            object_count = 0
+            uncompressed_size = 0
+            compressed_size = os.path.getsize(tar_path)
+
             for member in tarf:
                 if max_objects is not None:
                     if member.isfile():
-                        archive_size += 1
-                    if archive_size > max_objects:
+                        object_count += 1
+                    if object_count > max_objects:
                         raise ObjectCountError(
                                 "Archive has too many objects -"
                                 f" Max size is {max_objects} objects"
                         )
-                _validate_member(member,
+
+                _validate_member(member=member,
                                  extract_path=extract_abs_path,
-                                 allow_overwrite=allow_overwrite)
+                                 allow_overwrite=allow_overwrite,
+                                 max_ratio=max_ratio)
+
+                uncompressed_size += member.size
+
+                if max_ratio is not None:
+                    ratio = uncompressed_size / compressed_size
+                    if ratio > max_ratio:
+                        raise ArchiveSizeError(
+                            f"Archive '{tar_path}' has too large "
+                            f"compression ratio: {ratio:.2f} > {max_ratio}"
+                            )
+
+                if max_size is not None and uncompressed_size > max_size:
+                    raise ArchiveSizeError(
+                        f"Archive '{tar_path}' has too large uncompres"
+                        f"sed size: {uncompressed_size} > {max_size}")
+
                 try:
                     tarf.extract(
                             member,
@@ -152,7 +182,9 @@ def zipfile_extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: int | None = None
+        max_objects: int | None = None,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
     """Decompress using zipfile module.
 
@@ -165,8 +197,13 @@ def zipfile_extract(
         the cleanup. If False, archive is read only once and the members are
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with `precheck=False`.
-    :param max_objects: Limit how many objects the tar file can have. Use
+    :param max_objects: Limit how many objects the archive can have. Use
         `None` for no limit.
+    :param max_size: Limit how large the decompressed archive can be. Use
+        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+    :param max_ratio: Limit the archive's compression ratio. This is checked
+        for the entire archive and for each member of the archive. Use `None`
+        for no limit. Default limit is 100.
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
@@ -180,24 +217,43 @@ def zipfile_extract(
                     extract_path=extract_path,
                     allow_overwrite=allow_overwrite,
                     max_objects=max_objects,
+                    max_size=max_size,
+                    max_ratio=max_ratio
                 )
                 zipf.extractall(extract_path)
             else:
-                archive_size = 0
+                object_count = 0
+                uncompressed_size = sum(m.file_size for m in zipf.infolist())
+
+                if max_ratio is not None:
+                    compressed_size = os.path.getsize(zip_path)
+                    ratio = uncompressed_size / compressed_size
+                    if ratio > max_ratio:
+                        raise ArchiveSizeError(
+                            f"Archive '{zip_path}' has too large "
+                            f"compression ratio: {ratio:.2f} > {max_ratio}"
+                        )
+
+                if max_size is not None and uncompressed_size > max_size:
+                    raise ArchiveSizeError(
+                        f"Archive '{zip_path}' has too large uncompres"
+                        f"sed size: {uncompressed_size} > {max_size}")
+
                 for member in zipf.infolist():
                     if max_objects is not None:
                         if not member.is_dir():
-                            archive_size += 1
-                        if archive_size > max_objects:
+                            object_count += 1
+                        if object_count > max_objects:
                             raise ObjectCountError(
                                     "Archive has too many objects -"
                                     f" Max size is {max_objects} objects"
                             )
                     # Read archive only once by extracting files on the fly
                     extract_abs_path = os.path.abspath(extract_path)
-                    _validate_member(member,
+                    _validate_member(member=member,
                                      extract_path=extract_abs_path,
-                                     allow_overwrite=allow_overwrite)
+                                     allow_overwrite=allow_overwrite,
+                                     max_ratio=max_ratio)
                     zipf.extract(member, path=extract_abs_path)
 
     # Rare compression types like ppmd amd deflate64 that have not been
@@ -215,7 +271,9 @@ def _check_archive_members(
         archive_path: str | bytes | os.PathLike,
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
-        max_objects: int | None = None
+        max_objects: int | None = None,
+        max_size: int | None = None,
+        max_ratio: int | None = None,
 ) -> None:
     """Check that all files are extracted under `extract_path`, that the
     archive contains only regular files and directories, that extraction does
@@ -227,6 +285,10 @@ def _check_archive_members(
     :param allow_overwrite: Boolean to allow overwriting existing files
         without raising an error (defaults to False)
     :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit.
+    :param max_size: Limit how large the uncompressed archive can be. Use
+        `None` for no limit.
+    :param max_ratio: Limit the uncompressed to compressed data ratio. Use
         `None` for no limit.
     :raises ObjectCountError: If archive has too many objects.
     :raises ArchiveSizeError: If archive has too large compression
@@ -244,17 +306,17 @@ def _check_archive_members(
         archive = archive.infolist()
         uncompressed_size = sum(m.file_size for m in archive)
 
-    if uncompressed_size > SIZE_THRESHOLD:
+    if max_size is not None and uncompressed_size > max_size:
         raise ArchiveSizeError(
             f"Archive '{archive_path}' has too large uncompressed size: "
-            f"{uncompressed_size} > {SIZE_THRESHOLD}")
+            f"{uncompressed_size} > {max_size}")
 
-    if compressed_size > 0:
+    if max_ratio is not None and compressed_size > 0:
         ratio = uncompressed_size / compressed_size
-        if ratio > RATIO_THRESHOLD:
+        if ratio > max_ratio:
             raise ArchiveSizeError(
                 f"Archive '{archive_path}' has too large compression ratio: "
-                f"{ratio:.2f} > {RATIO_THRESHOLD}")
+                f"{ratio:.2f} > {max_ratio}")
 
     for member in archive:
         _validate_member(member=member,
@@ -276,7 +338,8 @@ def _check_archive_members(
 def _validate_member(
         member: tarfile.TarInfo | zipfile.ZipInfo,
         extract_path: str | bytes | os.PathLike,
-        allow_overwrite: bool = False
+        allow_overwrite: bool = False,
+        max_ratio: int | None = None
 ) -> None:
     """Validates that there are no issues with given member.
 
@@ -284,6 +347,8 @@ def _validate_member(
     :param extract_path: Directory where the archive is extracted to
     :param allow_overwrite: Boolean to allow overwriting existing files
         without raising an error (defaults to False).
+    :param max_ratio: Limit compression ratio for each member (only zip).
+        Use `None` for no limit.
     :raises MemberNameError: is raised when filename is invalid for the member.
     :raises MemberTypeError: is raised when the member is of unsupported
         filetype.
@@ -361,9 +426,10 @@ def _validate_member(
 
     # Check that the compression ratio does not exceed the threshold
     # Only zip for now, tarfile has no methods for uncompressed member size
-    if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0:
+    if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0 \
+            and max_ratio is not None:
         ratio = member.file_size / member.compress_size
-        if ratio > RATIO_THRESHOLD:
+        if ratio > max_ratio:
             raise ArchiveSizeError(f"File '{filename}' has too large"
                                    f"compression ratio: {ratio:.2f}")
 
@@ -373,7 +439,9 @@ def extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: bool | None = None,
+        max_objects: int | None = None,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
@@ -389,6 +457,12 @@ def extract(
         cleanup if member check raises an error with precheck=False.
     :param max_objects: Limit how many objects the tar file can have. Use
         `None` for no limit.
+    :param max_size: Limit how large the decompressed archive can be. Use
+        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+    :param max_ratio: Limit the archive's compression ratio. If tar archive,
+        this is *only* checked for the entire archive. For zip archives, each
+        member is also checked seperately. Use `None` for no limit. Default
+        limit is 100.
     :raises ExtractError: If extracting file is not supported.
     :returns: None
     """
@@ -397,12 +471,16 @@ def extract(
                         extract_path,
                         allow_overwrite=allow_overwrite,
                         precheck=precheck,
-                        max_objects=max_objects)
+                        max_objects=max_objects,
+                        max_size=max_size,
+                        max_ratio=max_ratio)
     elif zipfile.is_zipfile(archive):
         zipfile_extract(archive,
                         extract_path,
                         allow_overwrite=allow_overwrite,
                         precheck=precheck,
-                        max_objects=max_objects)
+                        max_objects=max_objects,
+                        max_size=max_size,
+                        max_ratio=max_ratio)
     else:
         raise ExtractError("File is not supported")
