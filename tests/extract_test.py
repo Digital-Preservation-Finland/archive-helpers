@@ -10,7 +10,7 @@ from archive_helpers.extract import (
     MemberNameError,
     MemberOverwriteError,
     MemberTypeError,
-    SuspiciousArchiveError,
+    ArchiveSizeError,
     extract,
 )
 
@@ -317,6 +317,6 @@ def test_tar_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
 
 def test_zip_bomb_is_detected(tmp_path):
     """Test that zip bombs are detected"""
-    with pytest.raises(SuspiciousArchiveError) as error:
+    with pytest.raises(ArchiveSizeError) as error:
         extract("tests/data/zip_bomb_220MB.zip", tmp_path, True, True, None)
-    assert "suspicious compression ratio" in str(error.value)
+    assert "too large compression ratio" in str(error.value)
