@@ -31,6 +31,7 @@ TAR_FILE_TYPES = {
 
 RATIO_THRESHOLD = 100
 SIZE_THRESHOLD = 4 * 1024 ** 4  # 4 TB
+OBJECT_THRESHOLD = 100000
 
 
 class ExtractError(Exception):
@@ -74,7 +75,7 @@ class ZipValidator:
             zipf: zipfile.ZipFile,
             extract_path: str | bytes | os.PathLike,
             allow_overwrite: bool = False,
-            max_objects: int | None = None,
+            max_objects: int | None = OBJECT_THRESHOLD,
             max_size: int | None = SIZE_THRESHOLD,
             max_ratio: int | None = RATIO_THRESHOLD,
     ) -> None:
@@ -84,7 +85,7 @@ class ZipValidator:
         :param extract_path: Directory where the archive is extracted.
         :param allow_overwrite: Allow overwriting existing files
             without raising an error (default False).
-        :param max_objects: Max number of objects allowed.
+        :param max_objects: Max number of objects allowed (default 100000).
         :param max_size: Max uncompressed size allowed (default 4TB).
         :param max_ratio: Max compression ratio allowed (default 100).
         """
@@ -168,7 +169,7 @@ def tarfile_extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: int | None = None,
+        max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
         max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
@@ -184,9 +185,9 @@ def tarfile_extract(
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with `precheck=False`.
     :param max_objects: Limit how many objects the tar file can have. Use
-        `None` for no limit.
+        `None` for no limit. Default limit is 1000000.
     :param max_size: Limit how large the decompressed archive can be. Use
-        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+        `None` for no limit. Default limit is 4TB.
     :param max_ratio: Limit the archive's compression ratio. This is *only*
         checked for the entire archive. Use `None` for no limit. Default limit
         is 100.
@@ -278,7 +279,7 @@ def zipfile_extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: int | None = None,
+        max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
         max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
@@ -294,9 +295,9 @@ def zipfile_extract(
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with `precheck=False`.
     :param max_objects: Limit how many objects the archive can have. Use
-        `None` for no limit.
+        `None` for no limit. Default limit is 100000.
     :param max_size: Limit how large the decompressed archive can be. Use
-        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+        `None` for no limit. Default limit is 4TB.
     :param max_ratio: Limit the archive's compression ratio. This is checked
         for the entire archive and for each member of the archive. Use `None`
         for no limit. Default limit is 100.
@@ -392,7 +393,7 @@ def _validate_member(
         allow_overwrite: bool = False,
         max_ratio: int | None = None
 ) -> None:
-    """Validates that there are no issues with given member.
+    """Validates that there are no issues with a given member.
 
     :param member: ZipInfo or TarInfo member.
     :param extract_path: Directory where the archive is extracted to
@@ -491,7 +492,7 @@ def extract(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         precheck: bool = True,
-        max_objects: int | None = None,
+        max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
         max_ratio: int | None = RATIO_THRESHOLD
 ) -> None:
@@ -508,9 +509,9 @@ def extract(
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with precheck=False.
     :param max_objects: Limit how many objects the tar file can have. Use
-        `None` for no limit.
+        `None` for no limit. Default limit is 100000.
     :param max_size: Limit how large the decompressed archive can be. Use
-        `None` for no limit. Default limit is 4TB (`4 * 1024 ** 4`).
+        `None` for no limit. Default limit is 4TB.
     :param max_ratio: Limit the archive's compression ratio. If tar archive,
         this is *only* checked for the entire archive. For zip archives, each
         member is also checked seperately. Use `None` for no limit. Default
