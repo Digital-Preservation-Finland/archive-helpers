@@ -1,5 +1,6 @@
 """Extract/decompress various archive formats"""
 from __future__ import annotations
+from typing import Generator
 
 import errno
 import os
@@ -66,6 +67,102 @@ class ArchiveSizeError(Exception):
     """
 
 
+class ZipValidator:
+    """Class for on-the-fly or full validation of zip archives."""
+    def __init__(
+            self,
+            zipf: zipfile.ZipFile,
+            extract_path: str | bytes | os.PathLike,
+            allow_overwrite: bool = False,
+            max_objects: int | None = None,
+            max_size: int | None = SIZE_THRESHOLD,
+            max_ratio: int | None = RATIO_THRESHOLD,
+    ) -> None:
+        """Create a `ZipValidator` instance. Use `None` to disable max limits.
+
+        :param zipf: Opened `ZipFile` object.
+        :param extract_path: Directory where the archive is extracted.
+        :param allow_overwrite: Allow overwriting existing files
+            without raising an error (default False).
+        :param max_objects: Max number of objects allowed.
+        :param max_size: Max uncompressed size allowed (default 4TB).
+        :param max_ratio: Max compression ratio allowed (default 100).
+        """
+        self.zipf = zipf
+        self.extract_path = extract_path
+        self.allow_overwrite = allow_overwrite
+        self.max_objects = max_objects
+        self.max_size = max_size
+        self.max_ratio = max_ratio
+
+        self.zip_path = zipf.filename
+        self.object_count = 0
+        self.uncompressed_size = 0
+        self.compressed_size = os.path.getsize(self.zip_path)
+
+    def update(self, member: zipfile.ZipInfo) -> None:
+        """
+        Update validation state with a new zip member for on-the-fly
+        validation.
+
+        :param member: A `ZipInfo` object from the archive.
+        :raises ArchiveSizeError: If size or ratio limits are exceeded.
+        :raises ObjectCountError: If object count limit is exceeded.
+        """
+        _validate_member(
+            member=member,
+            extract_path=os.path.abspath(self.extract_path),
+            allow_overwrite=self.allow_overwrite,
+            max_ratio=self.max_ratio,
+        )
+
+        if not member.is_dir():
+            self.object_count += 1
+            self.uncompressed_size += member.file_size
+
+        if self.max_objects is not None \
+                and self.object_count > self.max_objects:
+            raise ObjectCountError(
+                f"Archive '{self.zip_path}' has too many objects: "
+                f"{self.object_count} > {self.max_objects}"
+            )
+
+        if self.max_size is not None \
+                and self.uncompressed_size > self.max_size:
+            raise ArchiveSizeError(
+                f"Archive '{self.zip_path}' has too large uncompressed size: "
+                f"{self.uncompressed_size} > {self.max_size}"
+            )
+
+        if self.max_ratio is not None and self.compressed_size > 0:
+            ratio = self.uncompressed_size / self.compressed_size
+            if ratio > self.max_ratio:
+                raise ArchiveSizeError(
+                    f"Archive '{self.zip_path}' has too large "
+                    f"compression ratio: {ratio:.2f} > {self.max_ratio}"
+                )
+
+    def validate_all(self) -> list[zipfile.ZipInfo]:
+        """Fully validates the `ZipFile` object.
+
+        :returns: List containing the validated `ZipInfo` members.
+        :raises ArchiveSizeError: If size or ratio limits are exceeded.
+        :raises ObjectCountError: If object count limit is exceeded.
+        """
+        return list(self)
+
+    def __iter__(self) -> Generator[zipfile.ZipInfo, None, None]:
+        """Iterate over all members in the zip archive, validating each one.
+
+        :returns: Validated `ZipInfo` object.
+        :raises ArchiveSizeError: If size or ratio limits are exceeded.
+        :raises ObjectCountError: If object count limit is exceeded.
+        """
+        for member in self.zipf.infolist():
+            self.update(member)
+            yield member
+
+
 def tarfile_extract(
         tar_path: str | bytes | os.PathLike,
         extract_path: str | bytes | os.PathLike,
@@ -121,7 +218,6 @@ def tarfile_extract(
                 extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
-                max_size=max_size,
                 max_ratio=max_ratio
             )
         with tarfile.open(tar_path, 'r|*') as tarf:
@@ -204,57 +300,30 @@ def zipfile_extract(
     :param max_ratio: Limit the archive's compression ratio. This is checked
         for the entire archive and for each member of the archive. Use `None`
         for no limit. Default limit is 100.
+    :raises ArchiveSizeError: If the uncompressed archive is too large, or has
+        too large compression ratio.
+    :raises ObjectCountError: If the archive has too many objects.
     :returns: None
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
     try:
         with zipfile.ZipFile(zip_path) as zipf:
+            validator = ZipValidator(
+                zipf=zipf,
+                extract_path=extract_path,
+                allow_overwrite=allow_overwrite,
+                max_objects=max_objects,
+                max_size=max_size,
+                max_ratio=max_ratio
+            )
             if precheck:
-                _check_archive_members(
-                    archive=zipf,
-                    archive_path=zip_path,
-                    extract_path=extract_path,
-                    allow_overwrite=allow_overwrite,
-                    max_objects=max_objects,
-                    max_size=max_size,
-                    max_ratio=max_ratio
-                )
+                validator.validate_all()
                 zipf.extractall(extract_path)
             else:
-                object_count = 0
-                uncompressed_size = sum(m.file_size for m in zipf.infolist())
-
-                if max_ratio is not None:
-                    compressed_size = os.path.getsize(zip_path)
-                    ratio = uncompressed_size / compressed_size
-                    if ratio > max_ratio:
-                        raise ArchiveSizeError(
-                            f"Archive '{zip_path}' has too large "
-                            f"compression ratio: {ratio:.2f} > {max_ratio}"
-                        )
-
-                if max_size is not None and uncompressed_size > max_size:
-                    raise ArchiveSizeError(
-                        f"Archive '{zip_path}' has too large uncompres"
-                        f"sed size: {uncompressed_size} > {max_size}")
-
-                for member in zipf.infolist():
-                    if max_objects is not None:
-                        if not member.is_dir():
-                            object_count += 1
-                        if object_count > max_objects:
-                            raise ObjectCountError(
-                                    "Archive has too many objects -"
-                                    f" Max size is {max_objects} objects"
-                            )
-                    # Read archive only once by extracting files on the fly
-                    extract_abs_path = os.path.abspath(extract_path)
-                    _validate_member(member=member,
-                                     extract_path=extract_abs_path,
-                                     allow_overwrite=allow_overwrite,
-                                     max_ratio=max_ratio)
-                    zipf.extract(member, path=extract_abs_path)
+                # Read archive only once by extracting files on the fly
+                for member in validator:
+                    zipf.extract(member, path=os.path.abspath(extract_path))
 
     # Rare compression types like ppmd amd deflate64 that have not been
     # implemented should raise an ExtractError
@@ -272,56 +341,38 @@ def _check_archive_members(
         extract_path: str | bytes | os.PathLike,
         allow_overwrite: bool = False,
         max_objects: int | None = None,
-        max_size: int | None = None,
         max_ratio: int | None = None,
 ) -> None:
     """Check that all files are extracted under `extract_path`, that the
     archive contains only regular files and directories, that extraction does
-    not overwrite existing files (unless allowed), and that the compression
-    ratio or uncompressed size is not too large.
+    not overwrite existing files (unless allowed), and that the number of
+    members does not exceed the threshold `max_objects`.
 
-    :param archive: Opened `TarFile` or list of containing `ZipInfo` objects
+    For Zip archives, check that no member has a compression ratio that
+    exceeds the threshold `max_ratio` (this is not possible for tar).
+
+    :param archive: Opened `TarFile` or `ZipInfo` object
     :param extract_path: Directory where the archive is extracted
     :param allow_overwrite: Boolean to allow overwriting existing files
         without raising an error (defaults to False)
     :param max_objects: Limit how many objects the tar file can have. Use
         `None` for no limit.
-    :param max_size: Limit how large the uncompressed archive can be. Use
-        `None` for no limit.
-    :param max_ratio: Limit the uncompressed to compressed data ratio. Use
-        `None` for no limit.
+    :param max_ratio: Limit the uncompressed to compressed data ratio for each
+        member. Only applies to Zip archives. Use `None` for no limit.
     :raises ObjectCountError: If archive has too many objects.
-    :raises ArchiveSizeError: If archive has too large compression
-        ratio, or uncompressed size.
     :returns: None
     """
     extract_path = os.path.abspath(extract_path)
     archive_objects = 0
-    uncompressed_size = 0
-    compressed_size = os.path.getsize(archive_path)
-
-    if isinstance(archive, tarfile.TarFile):
-        uncompressed_size = sum(m.size for m in archive.getmembers())
-    if isinstance(archive, zipfile.ZipFile):
+    is_zip = isinstance(archive, zipfile.ZipFile)
+    if is_zip:
         archive = archive.infolist()
-        uncompressed_size = sum(m.file_size for m in archive)
-
-    if max_size is not None and uncompressed_size > max_size:
-        raise ArchiveSizeError(
-            f"Archive '{archive_path}' has too large uncompressed size: "
-            f"{uncompressed_size} > {max_size}")
-
-    if max_ratio is not None and compressed_size > 0:
-        ratio = uncompressed_size / compressed_size
-        if ratio > max_ratio:
-            raise ArchiveSizeError(
-                f"Archive '{archive_path}' has too large compression ratio: "
-                f"{ratio:.2f} > {max_ratio}")
 
     for member in archive:
         _validate_member(member=member,
                          extract_path=extract_path,
-                         allow_overwrite=allow_overwrite)
+                         allow_overwrite=allow_overwrite,
+                         max_ratio=max_ratio if is_zip else None)
         if max_objects is None:
             continue
 
@@ -424,13 +475,14 @@ def _validate_member(
     if not allow_overwrite and os.path.isfile(fpath):
         raise MemberOverwriteError(f"File '{filename}' already exists")
 
-    # Check that the compression ratio does not exceed the threshold
-    # Only zip for now, tarfile has no methods for uncompressed member size
+    # Check that the compression ratio does not exceed the threshold.
+    # This check only applies to zip archives, as tar archives do not
+    # compress individual members
     if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0 \
             and max_ratio is not None:
         ratio = member.file_size / member.compress_size
         if ratio > max_ratio:
-            raise ArchiveSizeError(f"File '{filename}' has too large"
+            raise ArchiveSizeError(f"File '{filename}' has too large "
                                    f"compression ratio: {ratio:.2f}")
 
 
