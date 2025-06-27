@@ -251,7 +251,7 @@ def test_zip_unsupported_compression_type_extract(tmpdir):
     """
     with pytest.raises(ExtractError) as error:
         extract("tests/data/zip_ppmd_compression.zip", str(tmpdir))
-    assert str(error.value) == "Compression type not supported."
+    assert str(error.value) == "Compression type not supported: ppmd"
 
 
 def test_extract_zip_unrecognized_external_attributes(tmpdir):

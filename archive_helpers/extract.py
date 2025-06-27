@@ -29,6 +29,34 @@ TAR_FILE_TYPES = {
     b"7": "CONT"
 }
 
+# Zip compression type names, copied from zipfile.py (compressor_names dict)
+ZIPFILE_COMPRESS_NAMES = {
+    0: 'store',
+    1: 'shrink',
+    2: 'reduce',
+    3: 'reduce',
+    4: 'reduce',
+    5: 'reduce',
+    6: 'implode',
+    7: 'tokenize',
+    8: 'deflate',
+    9: 'deflate64',
+    10: 'implode',
+    12: 'bzip2',
+    14: 'lzma',
+    18: 'terse',
+    19: 'lz77',
+    97: 'wavpack',
+    98: 'ppmd',
+}
+
+SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
+    zipfile.ZIP_STORED,
+    zipfile.ZIP_DEFLATED,
+    zipfile.ZIP_BZIP2,
+    zipfile.ZIP_LZMA
+}
+
 RATIO_THRESHOLD = 100
 SIZE_THRESHOLD = 4 * 1024 ** 4  # 4 TB
 OBJECT_THRESHOLD = 100000
@@ -269,8 +297,10 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
                 and max_ratio is not None:
             ratio = member.file_size / member.compress_size
             if ratio > max_ratio:
-                raise ArchiveSizeError(f"File '{filename}' has too large "
-                                       f"compression ratio: {ratio:.2f}")
+                raise ArchiveSizeError(
+                    f"File '{filename}' has too large compression ratio: "
+                    f"{ratio:.2f}"
+                )
 
     def __iter__(self) -> Generator[MemberT]:
         """Iterate over all members in the archive, validating each one.
@@ -304,6 +334,14 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
 
     def __iter__(self) -> Generator[zipfile.ZipInfo, None, None]:
         for member in self.archive.infolist():
+            comp_type = member.compress_type
+            if comp_type not in SUPPORTED_ZIPFILE_COMPRESS_TYPES:
+                # Rare compression types like ppmd amd deflate64 that have not
+                # been implemented should raise an ExtractError
+                raise ExtractError(
+                        "Compression type not supported: " +
+                        str(ZIPFILE_COMPRESS_NAMES.get(comp_type, comp_type))
+                    )
             self.update(member)
             yield member
 
@@ -455,32 +493,23 @@ def zipfile_extract(
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
-    try:
-        with zipfile.ZipFile(zip_path) as zipf:
-            validator = ZipValidator(
-                zipf=zipf,
-                extract_path=extract_path,
-                allow_overwrite=allow_overwrite,
-                max_objects=max_objects,
-                max_size=max_size,
-                max_ratio=max_ratio
-            )
-            if precheck:
-                validator.validate_all()
-                zipf.extractall(extract_path)
-            else:
-                # Read archive only once by extracting files on the fly
-                for member in validator:
-                    zipf.extract(member, path=os.path.abspath(extract_path))
 
-    # Rare compression types like ppmd amd deflate64 that have not been
-    # implemented should raise an ExtractError
-    except NotImplementedError as error:
-        # TODO: Python 3.9 error message does not tell the compression type
-        # anymore, although the information could be useful. The type could be
-        # dug out with ZipInfo.compress_type, but it can't be used with the
-        # ZipFile.extractall call above
-        raise ExtractError("Compression type not supported.") from error
+    with zipfile.ZipFile(zip_path) as zipf:
+        validator = ZipValidator(
+            zipf=zipf,
+            extract_path=extract_path,
+            allow_overwrite=allow_overwrite,
+            max_objects=max_objects,
+            max_size=max_size,
+            max_ratio=max_ratio
+        )
+        if precheck:
+            validator.validate_all()
+            zipf.extractall(extract_path)
+        else:
+            # Read archive only once by extracting files on the fly
+            for member in validator:
+                zipf.extract(member, path=os.path.abspath(extract_path))
 
 
 def extract(
