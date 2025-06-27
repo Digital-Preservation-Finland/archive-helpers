@@ -164,6 +164,70 @@ class ZipValidator:
             yield member
 
 
+class TarValidator:
+    def __init__(
+            self,
+            tarf: tarfile.TarFile,
+            extract_path: str | bytes | os.PathLike,
+            allow_overwrite: bool = False,
+            max_objects: int | None = OBJECT_THRESHOLD,
+            max_size: int | None = SIZE_THRESHOLD,
+            max_ratio: int | None = RATIO_THRESHOLD
+    ) -> None:
+        self.tarf = tarf
+        self.extract_path = extract_path
+        self.allow_overwrite = allow_overwrite
+        self.max_objects = max_objects
+        self.max_size = max_size
+        self.max_ratio = max_ratio
+
+        self.tar_path = tarf.name
+        self.object_count = 0
+        self.uncompressed_size = 0
+        self.compressed_size = os.path.getsize(self.tar_path)
+
+    def update(self, member: tarfile.TarInfo) -> None:
+        _validate_member(
+            member=member,
+            extract_path=os.path.abspath(self.extract_path),
+            allow_overwrite=self.allow_overwrite,
+        )
+
+        if member.isfile():
+            self.object_count += 1
+            self.uncompressed_size = member.size
+
+        if self.max_objects is not None \
+                and self.object_count > self.max_objects:
+            raise ObjectCountError(
+                f"Archive '{self.tar_path}' has too many objects: "
+                f"{self.object_count} > {self.max_objects}"
+            )
+
+        if self.max_size is not None \
+                and self.uncompressed_size > self.max_size:
+            raise ArchiveSizeError(
+                f"Archive '{self.tar_path}' has too large uncompressed size: "
+                f"{self.uncompressed_size} > {self.max_size}"
+            )
+
+        if self.max_ratio is not None and self.compressed_size > 0:
+            ratio = self.uncompressed_size / self.compressed_size
+            if ratio > self.max_ratio:
+                raise ArchiveSizeError(
+                    f"Archive '{self.tar_path}' has too large "
+                    f"compression ratio: {ratio:.2f} > {self.max_ratio}"
+                )
+
+    def validate_all(self) -> list[tarfile.TarFile]:
+        return list(self)
+
+    def __iter__(self) -> Generator[tarfile.TarFile, None, None]:
+        for member in self.tarf:
+            self.update(member)
+            yield member
+
+
 def tarfile_extract(
         tar_path: str | bytes | os.PathLike,
         extract_path: str | bytes | os.PathLike,
@@ -211,16 +275,18 @@ def tarfile_extract(
             is_blank = True
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
+
     if precheck:
         with tarfile.open(tar_path, 'r|*') as tarf:
-            _check_archive_members(
-                archive=tarf,
-                archive_path=tar_path,
+            validator = TarValidator(
+                tarf=tarf,
                 extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
+                max_size=max_size,
                 max_ratio=max_ratio
             )
+            validator.validate_all()
         with tarfile.open(tar_path, 'r|*') as tarf:
             try:
                 tarf.extractall(extract_path, filter="fully_trusted")
@@ -230,40 +296,16 @@ def tarfile_extract(
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
         with tarfile.open(tar_path, 'r|*') as tarf:
-            object_count = 0
-            uncompressed_size = 0
-            compressed_size = os.path.getsize(tar_path)
+            validator = TarValidator(
+                tarf=tarf,
+                extract_path=extract_path,
+                allow_overwrite=allow_overwrite,
+                max_objects=max_objects,
+                max_size=max_size,
+                max_ratio=max_ratio
+            )
 
-            for member in tarf:
-                if max_objects is not None:
-                    if member.isfile():
-                        object_count += 1
-                    if object_count > max_objects:
-                        raise ObjectCountError(
-                                "Archive has too many objects -"
-                                f" Max size is {max_objects} objects"
-                        )
-
-                _validate_member(member=member,
-                                 extract_path=extract_abs_path,
-                                 allow_overwrite=allow_overwrite,
-                                 max_ratio=max_ratio)
-
-                uncompressed_size += member.size
-
-                if max_ratio is not None:
-                    ratio = uncompressed_size / compressed_size
-                    if ratio > max_ratio:
-                        raise ArchiveSizeError(
-                            f"Archive '{tar_path}' has too large "
-                            f"compression ratio: {ratio:.2f} > {max_ratio}"
-                            )
-
-                if max_size is not None and uncompressed_size > max_size:
-                    raise ArchiveSizeError(
-                        f"Archive '{tar_path}' has too large uncompres"
-                        f"sed size: {uncompressed_size} > {max_size}")
-
+            for member in validator:
                 try:
                     tarf.extract(
                             member,
