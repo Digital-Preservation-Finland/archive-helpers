@@ -17,6 +17,7 @@ Group:          middleware
 License:        LGPLv3+
 URL:            https://www.digitalpreservation.fi
 Source0:        %{file_prefix}-v%{file_version}%{?file_release_tag}-%{file_build_number}-g%{file_commit_ref}.%{file_ext}
+Source1:        archive-helpers.conf
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
 
@@ -51,7 +52,11 @@ Summary:        %{summary}
 %pyproject_install
 %pyproject_save_files archive_helpers
 
+mkdir -m 755 -p %{buildroot}/etc/archive-helpers
+install -m 644 %{SOURCE1} %{buildroot}/etc/archive-helpers/archive-helpers.conf
+
 %files -n python3-archive-helpers -f %{pyproject_files}
+%config(noreplace) /etc/archive-helpers/archive-helpers.conf
 %license LICENSE
 %doc README.rst
 

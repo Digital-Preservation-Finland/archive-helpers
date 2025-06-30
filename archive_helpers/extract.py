@@ -7,6 +7,8 @@ import os
 import stat
 import tarfile
 import zipfile
+import configparser
+
 
 FILETYPES = {
     0o010000: "FIFO",
@@ -57,9 +59,11 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_LZMA
 }
 
-RATIO_THRESHOLD = 100
-SIZE_THRESHOLD = 4 * 1024 ** 4  # 4 TB
-OBJECT_THRESHOLD = 100000
+CONFIG = configparser.ConfigParser()
+CONFIG.read("/etc/archive-helpers/archive-helpers.conf")
+RATIO_THRESHOLD = int(CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD"))
+SIZE_THRESHOLD = int(CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD"))
+OBJECT_THRESHOLD = int(CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD"))
 
 
 class ExtractError(Exception):
@@ -193,7 +197,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     def _update_counts(self, _: MemberT) -> None:
         """Update `self.object_count` and `self.uncompressed_size`
 
-        This is implemented in child classes, because `TarInfo` and `ZipInfo`
+        This is implemented in child classes because `TarInfo` and `ZipInfo`
         objects have different properties.
         """
         raise NotImplementedError
