@@ -105,7 +105,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     def __init__(
             self,
             archive: ArchiveT,
-            extract_path: str | bytes | os.PathLike,
+            extract_path: str | bytes | os.PathLike | None,
             allow_overwrite: bool = False,
             max_objects: int | None = OBJECT_THRESHOLD,
             max_size: int | None = SIZE_THRESHOLD,
@@ -115,7 +115,8 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         limits.
 
         :param archive: Opened archive object.
-        :param extract_path: Directory where the archive is extracted.
+        :param extract_path: Directory where the archive is extracted. Use
+            `None` to disable related checks.
         :param allow_overwrite: Allow overwriting existing files
             without raising an error (default False).
         :param max_objects: Max number of objects allowed (default 100000).
@@ -153,7 +154,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         """
         self._validate_member(
             member=member,
-            extract_path=os.path.abspath(self.extract_path),
+            extract_path=os.path.abspath(self.extract_path) or None,
             allow_overwrite=self.allow_overwrite,
             max_ratio=self.max_ratio
         )
@@ -200,14 +201,15 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     def _validate_member(
         self,
         member: MemberT,
-        extract_path: str | bytes | os.PathLike,
+        extract_path: str | bytes | None,
         allow_overwrite: bool = False,
         max_ratio: int | None = None
     ) -> None:
         """Validates that there are no issues with a given member.
 
         :param member: ZipInfo or TarInfo member.
-        :param extract_path: Directory where the archive is extracted to
+        :param extract_path: Directory where the archive is extracted to. Use
+            `None` to disable related checks.
         :param allow_overwrite: Boolean to allow overwriting existing files
             without raising an error (defaults to False).
         :param max_ratio: Limit compression ratio for each member (only zip).
@@ -272,23 +274,16 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         member_type_instance = member.__class__.__name__
 
         filename = _get_filename[member_type_instance]()
-        fpath = os.path.abspath(os.path.join(extract_path, filename))
 
         # Evaluate the filetype
         supported_type, filetype = _evaluate_filetypes[member_type_instance]()
-
-        # Check if the archive member is valid
-        if not fpath.startswith(extract_path):
-            raise MemberNameError(f"Invalid file path: '{filename}'")
 
         if not supported_type:
             raise MemberTypeError(
                 f"File '{filename}' has unsupported type: {filetype}"
             )
 
-        # Do not raise error if overwriting member files is permitted
-        if not allow_overwrite and os.path.isfile(fpath):
-            raise MemberOverwriteError(f"File '{filename}' already exists")
+        self._validate_extract_path(extract_path, allow_overwrite, filename)
 
         # Check that the compression ratio does not exceed the threshold.
         # This check only applies to zip archives, as tar archives do not
@@ -301,6 +296,34 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
                     f"File '{filename}' has too large compression ratio: "
                     f"{ratio:.2f}"
                 )
+
+    def _validate_extract_path(
+            self,
+            extract_path: str | bytes | None,
+            allow_overwrite: bool,
+            filename: str
+    ) -> None:
+        """Check that the extract path is valid.
+
+        :param extract_path: Directory where the archive is extracted to. Use
+            `None` to disable related checks.
+        :param allow_overwrite: Boolean to allow overwriting existing files
+            without raising an error (defaults to False).
+        :param filename: Filename of the member.
+        :raises MemberNameError: is raised when filename is invalid for the
+            member.
+        :raises MemberOverwriteError: If an existing file was discovered in the
+            extract patch.
+        """
+        if extract_path is not None:
+            fpath = os.path.abspath(os.path.join(extract_path, filename))
+            # Check if the archive member is valid
+            if not fpath.startswith(extract_path):
+                raise MemberNameError(f"Invalid file path: '{filename}'")
+
+            # Do not raise error if overwriting member files is permitted
+            if not allow_overwrite and os.path.isfile(fpath):
+                raise MemberOverwriteError(f"File '{filename}' already exists")
 
     def __iter__(self) -> Generator[MemberT]:
         """Iterate over all members in the archive, validating each one.
@@ -318,7 +341,7 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
     def __init__(
             self,
             zipf: zipfile.ZipFile,
-            extract_path: str | bytes | os.PathLike,
+            extract_path: str | bytes | os.PathLike | None,
             allow_overwrite: bool = False,
             max_objects: int | None = OBJECT_THRESHOLD,
             max_size: int | None = SIZE_THRESHOLD,
@@ -351,7 +374,7 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
     def __init__(
             self,
             tarf: tarfile.TarFile,
-            extract_path: str | bytes | os.PathLike,
+            extract_path: str | bytes | os.PathLike | None,
             allow_overwrite: bool = False,
             max_objects: int | None = OBJECT_THRESHOLD,
             max_size: int | None = SIZE_THRESHOLD,
