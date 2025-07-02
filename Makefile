@@ -16,11 +16,6 @@ install:
 	    --root="${DESTDIR}" \
 	    --record=INSTALLED_FILES
 
-	# Copy configuration file
-	mkdir -p ${ARCHIVE_HELPERS_CONF_DIR}
-	cp include/rhel9/SOURCES/${ARCHIVE_HELPERS_CONF_FILE} ${ARCHIVE_HELPERS_CONF_PATH}
-	chmod 644 ${ARCHIVE_HELPERS_CONF_PATH}
-
 test:
 	${PYTHON} -m pytest tests -v \
 	    --junitprefix=archives-helper --junitxml=junit.xml
@@ -40,3 +35,7 @@ clean: clean-rpm
 clean-rpm:
 	rm -rf rpmbuild
 
+install-config:
+	mkdir -p ${ARCHIVE_HELPERS_CONF_DIR}
+	cp include/rhel9/SOURCES/${ARCHIVE_HELPERS_CONF_FILE} ${ARCHIVE_HELPERS_CONF_PATH}
+	chmod 644 ${ARCHIVE_HELPERS_CONF_PATH}

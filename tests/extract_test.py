@@ -1,8 +1,10 @@
 """Test extract function"""
 import os
+import sys
 import subprocess
 import tarfile
 
+from unittest import mock
 import pytest
 from archive_helpers.extract import (
     ExtractError,
@@ -11,6 +13,9 @@ from archive_helpers.extract import (
     MemberOverwriteError,
     MemberTypeError,
     ArchiveSizeError,
+    FALLBACK_RATIO_THRESHOLD,
+    FALLBACK_SIZE_THRESHOLD,
+    FALLBACK_OBJECT_THRESHOLD,
     extract,
 )
 
@@ -327,3 +332,47 @@ def test_zip_bomb_is_detected(archive, precheck, tmp_path):
     with pytest.raises(ArchiveSizeError) as error:
         extract(archive, tmp_path, True, precheck)
     assert "too large compression ratio" in str(error.value)
+
+
+def test_config_is_read_on_import():
+    """Test that a ConfigParser tries to read the config when `extract` is
+    imported.
+    """
+    with mock.patch("configparser.ConfigParser") as mock_parser_class:
+        mock_parser_instance = mock.MagicMock()
+        mock_parser_class.return_value = mock_parser_instance
+
+        mock_thresholds_section = mock.MagicMock()
+        mock_parser_instance.__getitem__.return_value = mock_thresholds_section
+        # Simulate .get()
+        mock_thresholds_section.get.side_effect = lambda key, _=None: {
+            "RATIO_THRESHOLD": str(FALLBACK_RATIO_THRESHOLD),
+            "SIZE_THRESHOLD": str(FALLBACK_SIZE_THRESHOLD),
+            "OBJECT_THRESHOLD": str(FALLBACK_OBJECT_THRESHOLD),
+        }[key]
+
+        # Force reimport
+        sys.modules.pop("archive_helpers.extract")
+        import archive_helpers.extract
+
+        # Importing module creates ConfigParser
+        mock_parser_class.assert_called_once()
+
+        # ConfigParser tries to read config file
+        mock_parser_instance.read.assert_called_once_with(
+            "/etc/archive-helpers/archive-helpers.conf"
+        )
+
+        # ConfigParser tries to access the THRESHOLDS section
+        mock_parser_instance.__getitem__.assert_any_call("THRESHOLDS")
+
+        # ConfigParser tries to access correct keys
+        expected_keys = {
+            "RATIO_THRESHOLD",
+            "SIZE_THRESHOLD",
+            "OBJECT_THRESHOLD",
+        }
+        actual_keys = {
+            call.args[0] for call in mock_thresholds_section.get.call_args_list
+        }
+        assert expected_keys == actual_keys

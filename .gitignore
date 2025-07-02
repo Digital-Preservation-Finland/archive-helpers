@@ -36,3 +36,4 @@ venv*/
 archive.tar
 tmp
 tags
+benchmark/

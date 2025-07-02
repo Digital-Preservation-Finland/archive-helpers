@@ -60,11 +60,25 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_LZMA,
 }
 
+FALLBACK_RATIO_THRESHOLD = 100
+FALLBACK_SIZE_THRESHOLD = 4 * 1024**4
+FALLBACK_OBJECT_THRESHOLD = 10**7
+
 CONFIG = configparser.ConfigParser()
-CONFIG.read("/etc/archive-helpers/archive-helpers.conf")
-RATIO_THRESHOLD = int(CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD"))
-SIZE_THRESHOLD = int(CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD"))
-OBJECT_THRESHOLD = int(CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD"))
+if CONFIG.read("/etc/archive-helpers/archive-helpers.conf"):
+    RATIO_THRESHOLD = int(
+        CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD", FALLBACK_RATIO_THRESHOLD)
+    )
+    SIZE_THRESHOLD = int(
+        CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD", FALLBACK_SIZE_THRESHOLD)
+    )
+    OBJECT_THRESHOLD = int(
+        CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD", FALLBACK_OBJECT_THRESHOLD)
+    )
+else:
+    RATIO_THRESHOLD = FALLBACK_RATIO_THRESHOLD
+    SIZE_THRESHOLD = FALLBACK_SIZE_THRESHOLD
+    OBJECT_THRESHOLD = FALLBACK_RATIO_THRESHOLD
 
 
 class ExtractError(Exception):
@@ -574,8 +588,11 @@ def extract(
     max_size: int | None = SIZE_THRESHOLD,
     max_ratio: int | None = RATIO_THRESHOLD,
 ) -> None:
-    """Extract tar or zip archives. Additionally, tar archives can be handled
-    as stream.
+    """Extract tar or zip archives.
+
+    If no values are provided for `max_objects`, `max_size` or `max_ratio`,
+    they use values from `/etc/archive-helpers/archive-helpers.conf`.
+    If reading the config fails, default values are used instead.
 
     :param archive: Path to the tar or zip archive
     :param extract_path: Directory where the archive is extracted
@@ -587,35 +604,28 @@ def extract(
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with precheck=False.
     :param max_objects: Limit how many objects the tar file can have. Use
-        `None` for no limit. Default limit is 100000.
+        `None` for no limit. Default limit is 1000000.
     :param max_size: Limit how large the decompressed archive can be. Use
         `None` for no limit. Default limit is 4TB.
-    :param max_ratio: Limit the archive's compression ratio. If tar archive,
-        this is *only* checked for the entire archive. For zip archives, each
-        member is also checked seperately. Use `None` for no limit. Default
-        limit is 100.
+    :param max_ratio: Limit the archive's compression ratio. For zip archives,
+        in addition to checking the entire archive, each member is also checked
+        individually. Use `None` for no limit. Defaul limit is 100.
     :raises ExtractError: If extracting file is not supported.
     :returns: None
     """
     if tarfile.is_tarfile(archive):
-        tarfile_extract(
-            archive,
-            extract_path,
-            allow_overwrite=allow_overwrite,
-            precheck=precheck,
-            max_objects=max_objects,
-            max_size=max_size,
-            max_ratio=max_ratio,
-        )
+        func = tarfile_extract
     elif zipfile.is_zipfile(archive):
-        zipfile_extract(
-            archive,
-            extract_path,
-            allow_overwrite=allow_overwrite,
-            precheck=precheck,
-            max_objects=max_objects,
-            max_size=max_size,
-            max_ratio=max_ratio,
-        )
+        func = zipfile_extract
     else:
         raise ExtractError("File is not supported")
+
+    func(
+        archive,
+        extract_path=extract_path,
+        allow_overwrite=allow_overwrite,
+        precheck=precheck,
+        max_objects=max_objects,
+        max_size=max_size,
+        max_ratio=max_ratio,
+    )
