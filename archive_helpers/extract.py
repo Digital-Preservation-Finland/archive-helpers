@@ -1,4 +1,5 @@
 """Extract/decompress various archive formats"""
+
 from __future__ import annotations
 from typing import Generator, TypeVar, Generic
 
@@ -17,7 +18,7 @@ FILETYPES = {
     0o060000: "BLK",
     0o100000: "REG",
     0o120000: "SYM",
-    0o140000: "SOCK"
+    0o140000: "SOCK",
 }
 
 TAR_FILE_TYPES = {
@@ -28,35 +29,35 @@ TAR_FILE_TYPES = {
     b"4": "BLK",
     b"5": "DIR",
     b"6": "FIFO",
-    b"7": "CONT"
+    b"7": "CONT",
 }
 
 # Zip compression type names, copied from zipfile.py (compressor_names dict)
 ZIPFILE_COMPRESS_NAMES = {
-    0: 'store',
-    1: 'shrink',
-    2: 'reduce',
-    3: 'reduce',
-    4: 'reduce',
-    5: 'reduce',
-    6: 'implode',
-    7: 'tokenize',
-    8: 'deflate',
-    9: 'deflate64',
-    10: 'implode',
-    12: 'bzip2',
-    14: 'lzma',
-    18: 'terse',
-    19: 'lz77',
-    97: 'wavpack',
-    98: 'ppmd',
+    0: "store",
+    1: "shrink",
+    2: "reduce",
+    3: "reduce",
+    4: "reduce",
+    5: "reduce",
+    6: "implode",
+    7: "tokenize",
+    8: "deflate",
+    9: "deflate64",
+    10: "implode",
+    12: "bzip2",
+    14: "lzma",
+    18: "terse",
+    19: "lz77",
+    97: "wavpack",
+    98: "ppmd",
 }
 
 SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_STORED,
     zipfile.ZIP_DEFLATED,
     zipfile.ZIP_BZIP2,
-    zipfile.ZIP_LZMA
+    zipfile.ZIP_LZMA,
 }
 
 CONFIG = configparser.ConfigParser()
@@ -106,14 +107,15 @@ MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo)
 
 class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     """Base Class for on-the-fly or full validation of zip or tar archives."""
+
     def __init__(
-            self,
-            archive: ArchiveT,
-            extract_path: str | bytes | os.PathLike | None,
-            allow_overwrite: bool = False,
-            max_objects: int | None = OBJECT_THRESHOLD,
-            max_size: int | None = SIZE_THRESHOLD,
-            max_ratio: int | None = RATIO_THRESHOLD,
+        self,
+        archive: ArchiveT,
+        extract_path: str | bytes | os.PathLike | None,
+        allow_overwrite: bool = False,
+        max_objects: int | None = OBJECT_THRESHOLD,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD,
     ) -> None:
         """Create an archive validator instance. Use `None` to disable max
         limits.
@@ -160,20 +162,24 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             member=member,
             extract_path=os.path.abspath(self.extract_path) or None,
             allow_overwrite=self.allow_overwrite,
-            max_ratio=self.max_ratio
+            max_ratio=self.max_ratio,
         )
 
         self._update_counts(member)
 
-        if self.max_objects is not None \
-                and self.object_count > self.max_objects:
+        if (
+            self.max_objects is not None
+            and self.object_count > self.max_objects
+        ):
             raise ObjectCountError(
                 f"Archive '{self.archive_path}' has too many objects: "
                 f"{self.object_count} > {self.max_objects}"
             )
 
-        if self.max_size is not None \
-                and self.uncompressed_size > self.max_size:
+        if (
+            self.max_size is not None
+            and self.uncompressed_size > self.max_size
+        ):
             raise ArchiveSizeError(
                 f"Archive '{self.archive_path}' has too large uncompressed"
                 f"size: {self.uncompressed_size} > {self.max_size}"
@@ -207,7 +213,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         member: MemberT,
         extract_path: str | bytes | None,
         allow_overwrite: bool = False,
-        max_ratio: int | None = None
+        max_ratio: int | None = None,
     ) -> None:
         """Validates that there are no issues with a given member.
 
@@ -233,8 +239,10 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             for zip files.
             :returns: Tuple of (supported_type, filetype)
             """
-            return (member.isfile() or member.isdir(),
-                    TAR_FILE_TYPES[member.type])
+            return (
+                member.isfile() or member.isdir(),
+                TAR_FILE_TYPES[member.type],
+            )
 
         def _zip_filetype_evaluation() -> tuple[bool, str]:
             """Inner function to set the supported_type and file_type variables
@@ -255,25 +263,26 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
                 # We'll allow files with non standard data in the external
                 # attributes, but we'll mask the mode by zeroing the upper
                 # two bytes used by unix systems.
-                member.external_attr &= 0xffff
+                member.external_attr &= 0xFFFF
                 mode = 0
 
             supported_type = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
             # Support zip archives made with non-POSIX compliant operating
             # systems where file mode is not specified, e.g., windows.
-            supported_type |= (mode == 0)
-            filetype = (FILETYPES[stat.S_IFMT(mode)] if mode != 0
-                        else "non-POSIX")
+            supported_type |= mode == 0
+            filetype = (
+                FILETYPES[stat.S_IFMT(mode)] if mode != 0 else "non-POSIX"
+            )
 
             return supported_type, filetype
 
         _get_filename = {
-            'TarInfo': lambda: member.name,
-            'ZipInfo': lambda: member.filename
+            "TarInfo": lambda: member.name,
+            "ZipInfo": lambda: member.filename,
         }
         _evaluate_filetypes = {
-            'TarInfo': _tar_filetype_evaluation,
-            'ZipInfo': _zip_filetype_evaluation
+            "TarInfo": _tar_filetype_evaluation,
+            "ZipInfo": _zip_filetype_evaluation,
         }
         member_type_instance = member.__class__.__name__
 
@@ -292,8 +301,11 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         # Check that the compression ratio does not exceed the threshold.
         # This check only applies to zip archives, as tar archives do not
         # compress individual members
-        if isinstance(member, zipfile.ZipInfo) and member.compress_size > 0 \
-                and max_ratio is not None:
+        if (
+            isinstance(member, zipfile.ZipInfo)
+            and member.compress_size > 0
+            and max_ratio is not None
+        ):
             ratio = member.file_size / member.compress_size
             if ratio > max_ratio:
                 raise ArchiveSizeError(
@@ -302,10 +314,10 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
                 )
 
     def _validate_extract_path(
-            self,
-            extract_path: str | bytes | None,
-            allow_overwrite: bool,
-            filename: str
+        self,
+        extract_path: str | bytes | None,
+        allow_overwrite: bool,
+        filename: str,
     ) -> None:
         """Check that the extract path is valid.
 
@@ -342,17 +354,24 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
 class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
     """Class for on-the-fly or full validation of zip archives."""
+
     def __init__(
-            self,
-            zipf: zipfile.ZipFile,
-            extract_path: str | bytes | os.PathLike | None,
-            allow_overwrite: bool = False,
-            max_objects: int | None = OBJECT_THRESHOLD,
-            max_size: int | None = SIZE_THRESHOLD,
-            max_ratio: int | None = RATIO_THRESHOLD,
+        self,
+        zipf: zipfile.ZipFile,
+        extract_path: str | bytes | os.PathLike | None,
+        allow_overwrite: bool = False,
+        max_objects: int | None = OBJECT_THRESHOLD,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD,
     ) -> None:
-        super().__init__(zipf, extract_path, allow_overwrite,
-                         max_objects, max_size, max_ratio)
+        super().__init__(
+            zipf,
+            extract_path,
+            allow_overwrite,
+            max_objects,
+            max_size,
+            max_ratio,
+        )
 
     def _update_counts(self, member: zipfile.ZipInfo) -> None:
         if not member.is_dir():
@@ -366,26 +385,33 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
                 # Rare compression types like ppmd amd deflate64 that have not
                 # been implemented should raise an ExtractError
                 raise ExtractError(
-                        "Compression type not supported: " +
-                        str(ZIPFILE_COMPRESS_NAMES.get(comp_type, comp_type))
-                    )
+                    "Compression type not supported: "
+                    + str(ZIPFILE_COMPRESS_NAMES.get(comp_type, comp_type))
+                )
             self.update(member)
             yield member
 
 
 class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
     """Class for on-the-fly or full validation of tar archives."""
+
     def __init__(
-            self,
-            tarf: tarfile.TarFile,
-            extract_path: str | bytes | os.PathLike | None,
-            allow_overwrite: bool = False,
-            max_objects: int | None = OBJECT_THRESHOLD,
-            max_size: int | None = SIZE_THRESHOLD,
-            max_ratio: int | None = RATIO_THRESHOLD
+        self,
+        tarf: tarfile.TarFile,
+        extract_path: str | bytes | os.PathLike | None,
+        allow_overwrite: bool = False,
+        max_objects: int | None = OBJECT_THRESHOLD,
+        max_size: int | None = SIZE_THRESHOLD,
+        max_ratio: int | None = RATIO_THRESHOLD,
     ) -> None:
-        super().__init__(tarf, extract_path, allow_overwrite,
-                         max_objects, max_size, max_ratio)
+        super().__init__(
+            tarf,
+            extract_path,
+            allow_overwrite,
+            max_objects,
+            max_size,
+            max_ratio,
+        )
 
     def _update_counts(self, member: tarfile.TarInfo) -> None:
         if member.isfile():
@@ -399,13 +425,13 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
 
 
 def tarfile_extract(
-        tar_path: str | bytes | os.PathLike,
-        extract_path: str | bytes | os.PathLike,
-        allow_overwrite: bool = False,
-        precheck: bool = True,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD
+    tar_path: str | bytes | os.PathLike,
+    extract_path: str | bytes | os.PathLike,
+    allow_overwrite: bool = False,
+    precheck: bool = True,
+    max_objects: int | None = OBJECT_THRESHOLD,
+    max_size: int | None = SIZE_THRESHOLD,
+    max_ratio: int | None = RATIO_THRESHOLD,
 ) -> None:
     """Decompress using tarfile module.
 
@@ -447,17 +473,17 @@ def tarfile_extract(
             raise ExtractError("Blank tar archives are not supported.")
 
     if precheck:
-        with tarfile.open(tar_path, 'r|*') as tarf:
+        with tarfile.open(tar_path, "r|*") as tarf:
             validator = TarValidator(
                 tarf=tarf,
                 extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
                 max_size=max_size,
-                max_ratio=max_ratio
+                max_ratio=max_ratio,
             )
             validator.validate_all()
-        with tarfile.open(tar_path, 'r|*') as tarf:
+        with tarfile.open(tar_path, "r|*") as tarf:
             try:
                 tarf.extractall(extract_path, filter="fully_trusted")
             except TypeError:  # 'filer' does not exist
@@ -465,35 +491,35 @@ def tarfile_extract(
     else:
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
-        with tarfile.open(tar_path, 'r|*') as tarf:
+        with tarfile.open(tar_path, "r|*") as tarf:
             validator = TarValidator(
                 tarf=tarf,
                 extract_path=extract_path,
                 allow_overwrite=allow_overwrite,
                 max_objects=max_objects,
                 max_size=max_size,
-                max_ratio=max_ratio
+                max_ratio=max_ratio,
             )
 
             for member in validator:
                 try:
                     tarf.extract(
-                            member,
-                            path=extract_abs_path,
-                            filter="fully_trusted",
-                        )
+                        member,
+                        path=extract_abs_path,
+                        filter="fully_trusted",
+                    )
                 except TypeError:  # 'filter' does not exist
                     tarf.extract(member, path=extract_abs_path)
 
 
 def zipfile_extract(
-        zip_path: str | bytes | os.PathLike,
-        extract_path: str | bytes | os.PathLike,
-        allow_overwrite: bool = False,
-        precheck: bool = True,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD
+    zip_path: str | bytes | os.PathLike,
+    extract_path: str | bytes | os.PathLike,
+    allow_overwrite: bool = False,
+    precheck: bool = True,
+    max_objects: int | None = OBJECT_THRESHOLD,
+    max_size: int | None = SIZE_THRESHOLD,
+    max_ratio: int | None = RATIO_THRESHOLD,
 ) -> None:
     """Decompress using zipfile module.
 
@@ -528,7 +554,7 @@ def zipfile_extract(
             allow_overwrite=allow_overwrite,
             max_objects=max_objects,
             max_size=max_size,
-            max_ratio=max_ratio
+            max_ratio=max_ratio,
         )
         if precheck:
             validator.validate_all()
@@ -540,13 +566,13 @@ def zipfile_extract(
 
 
 def extract(
-        archive: str | bytes | os.PathLike,
-        extract_path: str | bytes | os.PathLike,
-        allow_overwrite: bool = False,
-        precheck: bool = True,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD
+    archive: str | bytes | os.PathLike,
+    extract_path: str | bytes | os.PathLike,
+    allow_overwrite: bool = False,
+    precheck: bool = True,
+    max_objects: int | None = OBJECT_THRESHOLD,
+    max_size: int | None = SIZE_THRESHOLD,
+    max_ratio: int | None = RATIO_THRESHOLD,
 ) -> None:
     """Extract tar or zip archives. Additionally, tar archives can be handled
     as stream.
@@ -572,20 +598,24 @@ def extract(
     :returns: None
     """
     if tarfile.is_tarfile(archive):
-        tarfile_extract(archive,
-                        extract_path,
-                        allow_overwrite=allow_overwrite,
-                        precheck=precheck,
-                        max_objects=max_objects,
-                        max_size=max_size,
-                        max_ratio=max_ratio)
+        tarfile_extract(
+            archive,
+            extract_path,
+            allow_overwrite=allow_overwrite,
+            precheck=precheck,
+            max_objects=max_objects,
+            max_size=max_size,
+            max_ratio=max_ratio,
+        )
     elif zipfile.is_zipfile(archive):
-        zipfile_extract(archive,
-                        extract_path,
-                        allow_overwrite=allow_overwrite,
-                        precheck=precheck,
-                        max_objects=max_objects,
-                        max_size=max_size,
-                        max_ratio=max_ratio)
+        zipfile_extract(
+            archive,
+            extract_path,
+            allow_overwrite=allow_overwrite,
+            precheck=precheck,
+            max_objects=max_objects,
+            max_size=max_size,
+            max_ratio=max_ratio,
+        )
     else:
         raise ExtractError("File is not supported")
