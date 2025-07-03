@@ -16,6 +16,7 @@ from archive_helpers.extract import (
     FALLBACK_RATIO_THRESHOLD,
     FALLBACK_SIZE_THRESHOLD,
     FALLBACK_OBJECT_THRESHOLD,
+    CONFIG_PATH,
     extract,
 )
 
@@ -359,9 +360,7 @@ def test_config_is_read_on_import():
         mock_parser_class.assert_called_once()
 
         # ConfigParser tries to read config file
-        mock_parser_instance.read.assert_called_once_with(
-            "/etc/archive-helpers/archive-helpers.conf"
-        )
+        mock_parser_instance.read.assert_called_once_with(CONFIG_PATH)
 
         # ConfigParser tries to access the THRESHOLDS section
         mock_parser_instance.__getitem__.assert_any_call("THRESHOLDS")

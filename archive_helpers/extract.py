@@ -9,6 +9,7 @@ import stat
 import tarfile
 import zipfile
 import configparser
+import warnings
 
 
 FILETYPES = {
@@ -62,23 +63,22 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
 
 FALLBACK_RATIO_THRESHOLD = 100
 FALLBACK_SIZE_THRESHOLD = 4 * 1024**4
-FALLBACK_OBJECT_THRESHOLD = 10**7
+FALLBACK_OBJECT_THRESHOLD = 10**5
+CONFIG_PATH = "/etc/archive-helpers/archive-helpers.conf"
 
 CONFIG = configparser.ConfigParser()
-if CONFIG.read("/etc/archive-helpers/archive-helpers.conf"):
-    RATIO_THRESHOLD = int(
-        CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD", FALLBACK_RATIO_THRESHOLD)
-    )
-    SIZE_THRESHOLD = int(
-        CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD", FALLBACK_SIZE_THRESHOLD)
-    )
-    OBJECT_THRESHOLD = int(
-        CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD", FALLBACK_OBJECT_THRESHOLD)
-    )
+if CONFIG.read(CONFIG_PATH):
+    RATIO_THRESHOLD = int(CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD"))
+    SIZE_THRESHOLD = int(CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD"))
+    OBJECT_THRESHOLD = int(CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD"))
 else:
     RATIO_THRESHOLD = FALLBACK_RATIO_THRESHOLD
     SIZE_THRESHOLD = FALLBACK_SIZE_THRESHOLD
     OBJECT_THRESHOLD = FALLBACK_RATIO_THRESHOLD
+    warnings.warn(
+        f"Configuration file '{CONFIG_PATH}' not found, using defaults.",
+        UserWarning,
+    )
 
 
 class ExtractError(Exception):
@@ -133,6 +133,10 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     ) -> None:
         """Create an archive validator instance. Use `None` to disable max
         limits.
+
+        Max limits use values configured in
+        `/etc/archive-helpers-archive-helpers-conf`. If this file is not
+        available, default values are used instead.
 
         :param archive: Opened archive object.
         :param extract_path: Directory where the archive is extracted. Use
@@ -604,7 +608,7 @@ def extract(
         extracted immediately after the check. User is responsible for the
         cleanup if member check raises an error with precheck=False.
     :param max_objects: Limit how many objects the tar file can have. Use
-        `None` for no limit. Default limit is 1000000.
+        `None` for no limit. Default limit is 100000.
     :param max_size: Limit how large the decompressed archive can be. Use
         `None` for no limit. Default limit is 4TB.
     :param max_ratio: Limit the archive's compression ratio. For zip archives,
