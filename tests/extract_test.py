@@ -18,6 +18,7 @@ from archive_helpers.extract import (
     FALLBACK_OBJECT_THRESHOLD,
     CONFIG_PATH,
     extract,
+    open_tar
 )
 
 TAR_FILES = [
@@ -333,6 +334,20 @@ def test_zip_bomb_is_detected(archive, precheck, tmp_path):
     with pytest.raises(ArchiveSizeError) as error:
         extract(archive, tmp_path, True, precheck)
     assert "too large compression ratio" in str(error.value)
+
+
+def test_open_tar_extract(tmp_path):
+    """Test that open_tar can extract a tar archive"""
+    with open_tar(
+        "tests/data/tar_three_files.tar", extract_path=tmp_path
+    ) as tarf:
+        tarf.extractall(tmp_path, filter="fully_trusted")
+
+
+def test_open_tar_iterate_members():
+    with open_tar("tests/data/tar_three_files.tar") as tarf:
+        for _ in tarf:
+            pass
 
 
 def test_config_is_read_on_import():

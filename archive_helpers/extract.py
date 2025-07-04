@@ -1,7 +1,8 @@
 """Extract/decompress various archive formats"""
 
 from __future__ import annotations
-from typing import Generator, TypeVar, Generic
+from typing import TypeVar, Generic
+from collections.abc import Generator
 
 import errno
 import os
@@ -10,6 +11,7 @@ import tarfile
 import zipfile
 import configparser
 import warnings
+from contextlib import contextmanager
 
 
 FILETYPES = {
@@ -178,7 +180,11 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         """
         self._validate_member(
             member=member,
-            extract_path=os.path.abspath(self.extract_path) or None,
+            extract_path=(
+                os.path.abspath(self.extract_path)
+                if self.extract_path
+                else None
+            ),
             allow_overwrite=self.allow_overwrite,
             max_ratio=self.max_ratio,
         )
@@ -254,7 +260,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
         def _tar_filetype_evaluation() -> tuple[bool, str]:
             """Inner function to set the supported_type and file_type variables
-            for zip files.
+            for tar files.
             :returns: Tuple of (supported_type, filetype)
             """
             return (
@@ -264,7 +270,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
         def _zip_filetype_evaluation() -> tuple[bool, str]:
             """Inner function to set the supported_type and file_type variables
-            for tar files.
+            for zip files.
             :returns: Tuple of (supported_type, filetype)
             """
             mode = member.external_attr >> 16  # Upper two bytes of ext attr
@@ -352,7 +358,9 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         if extract_path is not None:
             fpath = os.path.abspath(os.path.join(extract_path, filename))
             # Check if the archive member is valid
-            if not fpath.startswith(extract_path):
+            if os.path.commonpath([fpath, extract_path]) != os.path.abspath(
+                extract_path
+            ):
                 raise MemberNameError(f"Invalid file path: '{filename}'")
 
             # Do not raise error if overwriting member files is permitted
@@ -613,7 +621,7 @@ def extract(
         `None` for no limit. Default limit is 4TB.
     :param max_ratio: Limit the archive's compression ratio. For zip archives,
         in addition to checking the entire archive, each member is also checked
-        individually. Use `None` for no limit. Defaul limit is 100.
+        individually. Use `None` for no limit. Default limit is 100.
     :raises ExtractError: If extracting file is not supported.
     :returns: None
     """
@@ -633,3 +641,59 @@ def extract(
         max_size=max_size,
         max_ratio=max_ratio,
     )
+
+
+@contextmanager
+def open_tar(
+    tar_path: str | bytes | os.PathLike,
+    mode: str = "r:*",
+    extract_path: str | bytes | os.PathLike | None = None,
+    allow_overwrite: bool = False,
+    max_objects: int = OBJECT_THRESHOLD,
+    max_size: int = SIZE_THRESHOLD,
+    max_ratio: int = RATIO_THRESHOLD,
+    **kwargs,
+) -> Generator[tarfile.TarFile, None, None]:
+    """Context manager wrapper for tarfile objects with validation.
+
+    Opens a tar archive and validates its contents before yielding a
+    `TarFile` instance.
+
+    If not provided, the values for `max_objects`, `max_size`, and `max_ratio`
+    are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
+    not found, default thresholds are used.
+
+    Usage::
+
+        # Iterate over members
+        with open_tar("/path/to/tar.tar") as tar:
+            for member in tar:
+                ...
+
+        # Extract contents
+        with open_tar("/path/to/tar.tar", extract_path="/extract") as tar:
+            tar.extractall("/extract")
+
+    :param tar_path: Path to the tar archive.
+    :param mode: Mode to open the archive (default: `"r:*"`).
+    :param extract_path: Directory to extract contents to. If `None`,
+        extraction path validation is disabled (defaul: `None`).
+    :param allow_overwrite: If `True`, allows overwriting existing files
+        without raising an error (default: `False`).
+    :param max_objects: Maximum number of files allowed in the archive. `None`
+        disables the check (default: 100000)
+    :param max_size: Maximum total size of extracted files in bytes. `None`
+        disables the check (default: 4TB).
+    :param max_ratio: Maximum allowed compression ratio. `None` disables the
+        check (default: 100).
+    :param kwargs: Additional keyword arguments passed to `tarfile.open()`.
+    :returns: A `TarFile` instance.
+    """
+    tarf = tarfile.open(name=tar_path, mode=mode, **kwargs)
+    TarValidator(
+        tarf, extract_path, allow_overwrite, max_objects, max_size, max_ratio
+    ).validate_all()
+    try:
+        yield tarf
+    finally:
+        tarf.close()
