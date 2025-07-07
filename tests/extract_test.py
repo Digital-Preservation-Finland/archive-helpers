@@ -327,17 +327,52 @@ def test_tar_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     [
         ("tests/data/zip_bomb_220MB.zip", False),
         ("tests/data/zip_bomb_220MB.zip", True),
-    ]
+    ],
 )
-def test_zip_bomb_is_detected(archive, precheck, tmp_path):
-    """Test that zip bombs are detected"""
+def test_zip_bomb_filesize_is_detected(archive, precheck, tmp_path):
+    """Test that zip bombs with too large size are detected"""
     with pytest.raises(ArchiveSizeError) as error:
         extract(archive, tmp_path, True, precheck)
     assert "too large compression ratio" in str(error.value)
 
 
+@pytest.mark.parametrize(
+    ("archive", "precheck"),
+    [
+        ("tests/data/zip_bomb_500_files.zip", False),
+        ("tests/data/zip_bomb_500_files.zip", True),
+    ],
+)
+def test_zip_bomb_filecount_is_detected(archive, precheck, tmp_path):
+    """Test that zip bombs with too many files are detected."""
+    with pytest.raises(ObjectCountError) as error:
+        extract(archive, tmp_path, True, precheck, max_objects=400)
+    assert "has too many objects" in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("archive", "precheck"),
+    [
+        ("tests/data/zip_bomb_220MB.zip", False),
+        ("tests/data/zip_bomb_220MB.zip", True),
+    ],
+)
+def test_zip_bomb_total_size_is_detected(archive, precheck, tmp_path):
+    """Test that zip bombs with too large total size are detected."""
+    with pytest.raises(ArchiveSizeError) as error:
+        extract(
+            archive,
+            tmp_path,
+            True,
+            precheck,
+            max_size=4*1024**2,
+            max_ratio=None,
+        )
+    assert "too large uncompressed size" in str(error.value)
+
+
 def test_open_tar_extract(tmp_path):
-    """Test that open_tar can extract a tar archive"""
+    """Test that open_tar can extract a tar archive."""
     with open_tar(
         "tests/data/tar_three_files.tar", extract_path=tmp_path
     ) as tarf:
@@ -345,9 +380,10 @@ def test_open_tar_extract(tmp_path):
 
 
 def test_open_tar_iterate_members():
+    """Test that open_tar can be used to iterate members."""
     with open_tar("tests/data/tar_three_files.tar") as tarf:
-        for _ in tarf:
-            pass
+        for member in tarf:
+            assert isinstance(member, tarfile.TarInfo)
 
 
 def test_config_is_read_on_import():

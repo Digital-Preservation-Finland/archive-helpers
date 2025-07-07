@@ -205,7 +205,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             and self.uncompressed_size > self.max_size
         ):
             raise ArchiveSizeError(
-                f"Archive '{self.archive_path}' has too large uncompressed"
+                f"Archive '{self.archive_path}' has too large uncompressed "
                 f"size: {self.uncompressed_size} > {self.max_size}"
             )
 
