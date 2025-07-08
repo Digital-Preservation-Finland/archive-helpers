@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import tarfile
+import zipfile
 
 from unittest import mock
 import pytest
@@ -18,7 +19,7 @@ from archive_helpers.extract import (
     FALLBACK_OBJECT_THRESHOLD,
     CONFIG_PATH,
     extract,
-    open_tar
+    open_archive,
 )
 
 TAR_FILES = [
@@ -371,19 +372,38 @@ def test_zip_bomb_total_size_is_detected(archive, precheck, tmp_path):
     assert "too large uncompressed size" in str(error.value)
 
 
-def test_open_tar_extract(tmp_path):
-    """Test that open_tar can extract a tar archive."""
-    with open_tar(
-        "tests/data/tar_three_files.tar", extract_path=tmp_path
-    ) as tarf:
-        tarf.extractall(tmp_path, filter="fully_trusted")
+@pytest.mark.parametrize(
+    ("archive", "is_tar"),
+    [
+        ("tests/data/tar_folder_and_three_files.tar", True),
+        ("tests/data/zip_folder_and_three_files.zip", False),
+    ],
+)
+def test_open_archive_extract(archive, is_tar, tmp_path):
+    """Test that open_archive can extract a tar archive."""
+    with open_archive(archive, extract_path=tmp_path) as arc:
+        if is_tar:
+            arc.extractall(tmp_path, filter="fully_trusted")
+        else:
+            arc.extractall(tmp_path)
 
 
-def test_open_tar_iterate_members():
-    """Test that open_tar can be used to iterate members."""
-    with open_tar("tests/data/tar_three_files.tar") as tarf:
-        for member in tarf:
-            assert isinstance(member, tarfile.TarInfo)
+@pytest.mark.parametrize(
+    ("archive", "is_tar"),
+    [
+        ("tests/data/tar_folder_and_three_files.tar", True),
+        ("tests/data/zip_folder_and_three_files.zip", False),
+    ],
+)
+def test_open_archive_iterate_members(archive, is_tar):
+    """Test that open_archive can be used to iterate members."""
+    with open_archive(archive) as arc:
+        if is_tar:
+            for member in arc:
+                assert isinstance(member, tarfile.TarInfo)
+        else:
+            for member in arc.infolist():
+                assert isinstance(member, zipfile.ZipInfo)
 
 
 def test_config_is_read_on_import():

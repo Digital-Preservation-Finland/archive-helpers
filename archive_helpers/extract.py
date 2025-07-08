@@ -1,7 +1,7 @@
 """Extract/decompress various archive formats"""
 
 from __future__ import annotations
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Literal, Any
 from collections.abc import Generator
 
 import errno
@@ -630,7 +630,7 @@ def extract(
     elif zipfile.is_zipfile(archive):
         func = zipfile_extract
     else:
-        raise ExtractError("File is not supported")
+        raise ExtractError(f"File '{archive}' is not supported")
 
     func(
         archive,
@@ -646,13 +646,13 @@ def extract(
 @contextmanager
 def open_tar(
     tar_path: str | bytes | os.PathLike,
-    mode: str = "r:*",
+    mode: str = "r*:",
     extract_path: str | bytes | os.PathLike | None = None,
     allow_overwrite: bool = False,
     max_objects: int = OBJECT_THRESHOLD,
     max_size: int = SIZE_THRESHOLD,
     max_ratio: int = RATIO_THRESHOLD,
-    **kwargs,
+    **kwargs: Any,
 ) -> Generator[tarfile.TarFile, None, None]:
     """Context manager wrapper for tarfile objects with validation.
 
@@ -672,14 +672,14 @@ def open_tar(
 
         # Extract contents
         with open_tar("/path/to/tar.tar", extract_path="/extract") as tar:
-            tar.extractall("/extract")
+            tar.extractall("/extract", filter="fully_trusted")
 
     :param tar_path: Path to the tar archive.
     :param mode: Mode to open the archive (default: `"r:*"`).
     :param extract_path: Directory to extract contents to. If `None`,
-        extraction path validation is disabled (defaul: `None`).
-    :param allow_overwrite: If `True`, allows overwriting existing files
-        without raising an error (default: `False`).
+        extraction path validation is disabled (default: `None`).
+    :param allow_overwrite: If `True`, allows overwriting existing files when
+        checking the `extract_path`. (default: `False`).
     :param max_objects: Maximum number of files allowed in the archive. `None`
         disables the check (default: 100000)
     :param max_size: Maximum total size of extracted files in bytes. `None`
@@ -697,3 +697,121 @@ def open_tar(
         yield tarf
     finally:
         tarf.close()
+
+
+@contextmanager
+def open_zip(
+    zip_path: str | bytes | os.PathLike,
+    mode: Literal["r", "w", "a", "x"] = "r",
+    extract_path: str | bytes | os.PathLike | None = None,
+    allow_overwrite: bool = False,
+    max_objects: int = OBJECT_THRESHOLD,
+    max_size: int = SIZE_THRESHOLD,
+    max_ratio: int = RATIO_THRESHOLD,
+    **kwargs: Any,
+) -> Generator[zipfile.ZipFile, None, None]:
+    """Context manager wrapper for zipfile objects with validation.
+
+    Opens a zip archive and validates its contents before yielding a `ZipFile`
+    instance.
+
+    If not provided, the values for `max_objects`, `max_size`, and `max_ratio`
+    are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
+    not found, default thresholds are used.
+
+    Usage::
+
+        # Iterate over members
+        with open_zip("/path/to/zip.zip") as zip:
+            for member in zip.infolist():
+                ...
+
+        # Extract contents
+        with open_zip("/path/to/zip.zip", extract_path="/extract") as zip:
+            zip.extractall("/extract")
+
+    :param zip_path: Path to the zip archive.
+    :param mode: Mode to open the archive (default: `"r:*"`).
+    :param allow_overwrite: If `True`, allows overwriting existing files when
+        checking the `extract_path`. (default: `False`).
+    :param max_objects: Maximum number of files allowed in the archive. `None`
+        disables the check (default 100000).
+    :param max_size: Maximum total size of extracted files in bytes. `None`
+        disables the check (default 4TB).
+    :param max_ratio: Maximum allowed compression ratio. `None` disables the
+        check (default 100).
+    :param kwargs: Additional keyword arguments passed to `zipfile.ZipFile()`.
+    :returns: A `ZipFile` instance.
+    """
+    zipf = zipfile.ZipFile(file=zip_path, mode=mode, **kwargs)
+    ZipValidator(
+        zipf, extract_path, allow_overwrite, max_objects, max_size, max_ratio
+    ).validate_all()
+    try:
+        yield zipf
+    finally:
+        zipf.close()
+
+
+@contextmanager
+def open_archive(
+    archive: str | bytes | os.PathLike,
+    mode: str | None = None,
+    extract_path: str | bytes | os.PathLike | None = None,
+    allow_overwrite: bool = False,
+    max_objects: int = OBJECT_THRESHOLD,
+    max_size: int = SIZE_THRESHOLD,
+    max_ratio: int = RATIO_THRESHOLD,
+    **kwargs: Any,
+) -> Generator[tarfile.TarFile | zipfile.ZipFile, None, None]:
+    """Context manager wrapper for archives with validation.
+
+    Opens a tar or zip archive and validates its contents before yielding an
+    archive object intance.
+
+    If not provided, the values for `max_objects`, `max_size`, and `max_ratio`
+    are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
+    not found, default thresholds are used.
+
+    :param tar_path: Path to the archive.
+    :param mode: Mode to open the archive. If `None`, uses `"r:*"` for tar
+        files and `"r"` for zip files (default: `None`).
+    :param extract_path: Directory to extract contents to. If `None`,
+        extraction path validation is disabled (default: `None`).
+    :param allow_overwrite: If `True`, allows overwriting existing files when
+        checking the `extract_path`. (default: `False`).
+    :param max_objects: Maximum number of files allowed in the archive. `None`
+        disables the check (default: 100000)
+    :param max_size: Maximum total size of extracted files in bytes. `None`
+        disables the check (default: 4TB).
+    :param max_ratio: Maximum allowed compression ratio. `None` disables the
+        check (default: 100).
+    :param kwargs: Additional keyword arguments to pass when opening the
+        archive.
+    :returns: A `TarFile` or `ZipFile` instance.
+    """
+    if tarfile.is_tarfile(archive):
+        if mode is None:
+            mode = "r:*"
+        func = open_tar
+    elif zipfile.is_zipfile(archive):
+        if mode is None:
+            mode = "r"
+        func = open_zip
+    else:
+        raise ExtractError(f"File '{archive}' is not supported")
+
+    try:
+        with func(
+            archive,
+            mode,
+            extract_path,
+            allow_overwrite,
+            max_objects,
+            max_size,
+            max_ratio,
+            **kwargs,
+        ) as arc:
+            yield arc
+    except Exception as e:
+        raise ExtractError(f"Failed to open '{archive}': {e}") from e
