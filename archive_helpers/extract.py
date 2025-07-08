@@ -76,7 +76,7 @@ if CONFIG.read(CONFIG_PATH):
 else:
     RATIO_THRESHOLD = FALLBACK_RATIO_THRESHOLD
     SIZE_THRESHOLD = FALLBACK_SIZE_THRESHOLD
-    OBJECT_THRESHOLD = FALLBACK_RATIO_THRESHOLD
+    OBJECT_THRESHOLD = FALLBACK_OBJECT_THRESHOLD
     warnings.warn(
         f"Configuration file '{CONFIG_PATH}' not found, using defaults.",
         UserWarning,
