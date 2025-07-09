@@ -196,8 +196,8 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             and self.object_count > self.max_objects
         ):
             raise ObjectCountError(
-                f"Archive '{self.archive_path}' has too many objects: "
-                f"{self.object_count} > {self.max_objects}"
+                f"Archive '{self.archive_path}' contains more than the allowed"
+                f" number of objects ({self.max_objects})."
             )
 
         if (
@@ -205,16 +205,16 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             and self.uncompressed_size > self.max_size
         ):
             raise ArchiveSizeError(
-                f"Archive '{self.archive_path}' has too large uncompressed "
-                f"size: {self.uncompressed_size} > {self.max_size}"
+                f"Archive '{self.archive_path}' exceeds the allowed"
+                f" uncompressed size limit of {self.max_size} bytes."
             )
 
         if self.max_ratio is not None and self.compressed_size > 0:
             ratio = self.uncompressed_size / self.compressed_size
             if ratio > self.max_ratio:
                 raise ArchiveSizeError(
-                    f"Archive '{self.archive_path}' has too large "
-                    f"compression ratio: {ratio:.2f} > {self.max_ratio}"
+                    f"Archive '{self.archive_path}' exceeds the allowed"
+                    f" compression ratio of {self.max_ratio}."
                 )
 
     def _get_archive_path(self, archive: ArchiveT) -> str:
@@ -333,8 +333,8 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             ratio = member.file_size / member.compress_size
             if ratio > max_ratio:
                 raise ArchiveSizeError(
-                    f"File '{filename}' has too large compression ratio: "
-                    f"{ratio:.2f}"
+                    f"Compression ratio of file '{filename}' ({ratio:.2f})"
+                    f"exceeds the allowed maximum ({max_ratio:.2f})."
                 )
 
     def _validate_extract_path(

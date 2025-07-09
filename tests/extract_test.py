@@ -294,7 +294,7 @@ def test_zip_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     elif not size_ok:
         with pytest.raises(ObjectCountError) as error:
             extract(archive, tmp_path, True, precheck, max_objects)
-        assert "too many objects" in str(error.value)
+        assert "allowed number of objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -320,7 +320,7 @@ def test_tar_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     elif not size_ok:
         with pytest.raises(ObjectCountError) as error:
             extract(archive, tmp_path, True, precheck, max_objects)
-        assert "too many objects" in str(error.value)
+        assert "allowed number of objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -334,7 +334,7 @@ def test_zip_bomb_filesize_is_detected(archive, precheck, tmp_path):
     """Test that zip bombs with too large size are detected"""
     with pytest.raises(ArchiveSizeError) as error:
         extract(archive, tmp_path, True, precheck)
-    assert "too large compression ratio" in str(error.value)
+    assert "exceeds the allowed maximum" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -348,7 +348,7 @@ def test_zip_bomb_filecount_is_detected(archive, precheck, tmp_path):
     """Test that zip bombs with too many files are detected."""
     with pytest.raises(ObjectCountError) as error:
         extract(archive, tmp_path, True, precheck, max_objects=400)
-    assert "has too many objects" in str(error.value)
+    assert "allowed number of objects" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -369,7 +369,7 @@ def test_zip_bomb_total_size_is_detected(archive, precheck, tmp_path):
             max_size=4*1024**2,
             max_ratio=None,
         )
-    assert "too large uncompressed size" in str(error.value)
+    assert "uncompressed size limit" in str(error.value)
 
 
 @pytest.mark.parametrize(
