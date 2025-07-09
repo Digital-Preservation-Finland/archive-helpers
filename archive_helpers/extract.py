@@ -35,27 +35,6 @@ TAR_FILE_TYPES = {
     b"7": "CONT",
 }
 
-# Zip compression type names, copied from zipfile.py (compressor_names dict)
-ZIPFILE_COMPRESS_NAMES = {
-    0: "store",
-    1: "shrink",
-    2: "reduce",
-    3: "reduce",
-    4: "reduce",
-    5: "reduce",
-    6: "implode",
-    7: "tokenize",
-    8: "deflate",
-    9: "deflate64",
-    10: "implode",
-    12: "bzip2",
-    14: "lzma",
-    18: "terse",
-    19: "lz77",
-    97: "wavpack",
-    98: "ppmd",
-}
-
 SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_STORED,
     zipfile.ZIP_DEFLATED,
@@ -412,7 +391,7 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
                 # been implemented should raise an ExtractError
                 raise ExtractError(
                     "Compression type not supported: "
-                    + str(ZIPFILE_COMPRESS_NAMES.get(comp_type, comp_type))
+                    + str(zipfile.compressor_names.get(comp_type, comp_type))
                 )
             self.update(member)
             yield member
