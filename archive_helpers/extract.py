@@ -9,10 +9,9 @@ import os
 import stat
 import tarfile
 import zipfile
-import configparser
-import warnings
 from contextlib import contextmanager
 
+from archive_helpers.config import CONFIG
 
 FILETYPES = {
     0o010000: "FIFO",
@@ -42,24 +41,9 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_LZMA,
 }
 
-FALLBACK_RATIO_THRESHOLD = 100
-FALLBACK_SIZE_THRESHOLD = 4 * 1024**4
-FALLBACK_OBJECT_THRESHOLD = 10**5
-CONFIG_PATH = "/etc/archive-helpers/archive-helpers.conf"
-
-CONFIG = configparser.ConfigParser()
-if CONFIG.read(CONFIG_PATH):
-    RATIO_THRESHOLD = int(CONFIG["THRESHOLDS"].get("RATIO_THRESHOLD"))
-    SIZE_THRESHOLD = int(CONFIG["THRESHOLDS"].get("SIZE_THRESHOLD"))
-    OBJECT_THRESHOLD = int(CONFIG["THRESHOLDS"].get("OBJECT_THRESHOLD"))
-else:
-    RATIO_THRESHOLD = FALLBACK_RATIO_THRESHOLD
-    SIZE_THRESHOLD = FALLBACK_SIZE_THRESHOLD
-    OBJECT_THRESHOLD = FALLBACK_OBJECT_THRESHOLD
-    warnings.warn(
-        f"Configuration file '{CONFIG_PATH}' not found, using defaults.",
-        UserWarning,
-    )
+RATIO_THRESHOLD = CONFIG.max_ratio
+SIZE_THRESHOLD = CONFIG.max_size
+OBJECT_THRESHOLD = CONFIG.max_objects
 
 
 class ExtractError(Exception):
@@ -115,7 +99,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         """Create an archive validator instance. Use `None` to disable max
         limits.
 
-        Max limits use values configured in
+        If not provided, max limits use values configured in
         `/etc/archive-helpers-archive-helpers-conf`. If this file is not
         available, default values are used instead.
 
@@ -128,9 +112,11 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         :param max_size: Max uncompressed size allowed (default 4TB).
         :param max_ratio: Max compression ratio allowed (default 100).
         """
+
         self.archive = archive
         self.extract_path = extract_path
         self.allow_overwrite = allow_overwrite
+
         self.max_objects = max_objects
         self.max_size = max_size
         self.max_ratio = max_ratio
@@ -313,7 +299,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             if ratio > max_ratio:
                 raise ArchiveSizeError(
                     f"Compression ratio of file '{filename}' ({ratio:.2f})"
-                    f"exceeds the allowed maximum ({max_ratio:.2f})."
+                    f" exceeds the allowed maximum ({max_ratio:.2f})."
                 )
 
     def _validate_extract_path(
