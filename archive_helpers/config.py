@@ -44,9 +44,15 @@ def get_config(
     if config_parser.read(config_path):
         section = config_parser["THRESHOLDS"]
         return Config(
-            max_ratio=section.getint("RATIO_THRESHOLD"),
-            max_size=section.getint("SIZE_THRESHOLD"),
-            max_objects=section.getint("OBJECT_THRESHOLD"),
+            max_ratio=section.getint(
+                "RATIO_THRESHOLD", fallback=DEFAULT_RATIO_THRESHOLD
+            ),
+            max_size=section.getint(
+                "SIZE_THRESHOLD", fallback=DEFAULT_SIZE_THRESHOLD
+            ),
+            max_objects=section.getint(
+                "OBJECT_THRESHOLD", fallback=DEFAULT_OBJECT_THRESHOLD
+            ),
         )
 
     warnings.warn(

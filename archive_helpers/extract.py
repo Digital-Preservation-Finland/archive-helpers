@@ -1,7 +1,7 @@
 """Extract/decompress various archive formats"""
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Literal, Any
+from typing import TypeVar, Generic, Literal, Any, get_args
 from collections.abc import Generator
 
 import errno
@@ -90,7 +90,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     def __init__(
         self,
         archive: ArchiveT,
-        extract_path: str | bytes | os.PathLike | None,
+        extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
         max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
@@ -184,12 +184,12 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
     def _get_archive_path(self, archive: ArchiveT) -> str:
         if isinstance(archive, zipfile.ZipFile):
-            return archive.filename
+            return str(archive.filename)
         if isinstance(archive, tarfile.TarFile):
-            return archive.name
+            return str(archive.name)
         raise TypeError(f"Unsupported archive type: {type(archive)}")
 
-    def _update_counts(self, _: MemberT) -> None:
+    def _update_counts(self, member: MemberT) -> None:
         """Update `self.object_count` and `self.uncompressed_size`
 
         This is implemented in child classes because `TarInfo` and `ZipInfo`
@@ -200,7 +200,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
     def _validate_member(
         self,
         member: MemberT,
-        extract_path: str | bytes | None,
+        extract_path: str | None,
         allow_overwrite: bool = False,
         max_ratio: int | None = None,
     ) -> None:
@@ -223,7 +223,9 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             ratio.
         """
 
-        def _tar_filetype_evaluation() -> tuple[bool, str]:
+        def _tar_filetype_evaluation(
+            member: tarfile.TarInfo,
+        ) -> tuple[bool, str]:
             """Inner function to set the supported_type and file_type variables
             for tar files.
             :returns: Tuple of (supported_type, filetype)
@@ -233,12 +235,14 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
                 TAR_FILE_TYPES[member.type],
             )
 
-        def _zip_filetype_evaluation() -> tuple[bool, str]:
+        def _zip_filetype_evaluation(
+            member: zipfile.ZipInfo,
+        ) -> tuple[bool, str]:
             """Inner function to set the supported_type and file_type variables
             for zip files.
             :returns: Tuple of (supported_type, filetype)
             """
-            mode = member.external_attr >> 16  # Upper two bytes of ext attr
+            mode = member.external_attr >> 16  # Upper two bytes of ext attr'
 
             if mode != 0 and stat.S_IFMT(mode) not in FILETYPES:
                 # Unrecognized modes are probably created by accident on
@@ -265,21 +269,18 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
             return supported_type, filetype
 
-        _get_filename = {
-            "TarInfo": lambda: member.name,
-            "ZipInfo": lambda: member.filename,
-        }
-        _evaluate_filetypes = {
-            "TarInfo": _tar_filetype_evaluation,
-            "ZipInfo": _zip_filetype_evaluation,
-        }
-        member_type_instance = member.__class__.__name__
-
-        filename = _get_filename[member_type_instance]()
-
         # Evaluate the filetype
-        supported_type, filetype = _evaluate_filetypes[member_type_instance]()
+        supported_type, filetype = (
+            _tar_filetype_evaluation(member)
+            if isinstance(member, tarfile.TarInfo)
+            else _zip_filetype_evaluation(member)
+        )
 
+        filename = (
+            member.filename
+            if isinstance(member, zipfile.ZipInfo)
+            else member.name
+        )
         if not supported_type:
             raise MemberTypeError(
                 f"File '{filename}' has unsupported type: {filetype}"
@@ -304,7 +305,7 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
 
     def _validate_extract_path(
         self,
-        extract_path: str | bytes | None,
+        extract_path: str | None,
         allow_overwrite: bool,
         filename: str,
     ) -> None:
@@ -349,7 +350,7 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
     def __init__(
         self,
         zipf: zipfile.ZipFile,
-        extract_path: str | bytes | os.PathLike | None,
+        extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
         max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
@@ -389,7 +390,7 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
     def __init__(
         self,
         tarf: tarfile.TarFile,
-        extract_path: str | bytes | os.PathLike | None,
+        extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
         max_objects: int | None = OBJECT_THRESHOLD,
         max_size: int | None = SIZE_THRESHOLD,
@@ -416,8 +417,8 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
 
 
 def tarfile_extract(
-    tar_path: str | bytes | os.PathLike,
-    extract_path: str | bytes | os.PathLike,
+    tar_path: str | os.PathLike,
+    extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
     max_objects: int | None = OBJECT_THRESHOLD,
@@ -504,8 +505,8 @@ def tarfile_extract(
 
 
 def zipfile_extract(
-    zip_path: str | bytes | os.PathLike,
-    extract_path: str | bytes | os.PathLike,
+    zip_path: str | os.PathLike,
+    extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
     max_objects: int | None = OBJECT_THRESHOLD,
@@ -557,8 +558,8 @@ def zipfile_extract(
 
 
 def extract(
-    archive: str | bytes | os.PathLike,
-    extract_path: str | bytes | os.PathLike,
+    archive: str | os.PathLike,
+    extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
     max_objects: int | None = OBJECT_THRESHOLD,
@@ -608,11 +609,47 @@ def extract(
     )
 
 
+TarMode = Literal[
+    "r",
+    "r:*",
+    "r:",
+    "r:gz",
+    "r:bz2",
+    "r:xz",
+    "a",
+    "a:",
+    "w",
+    "w:",
+    "w:gz",
+    "w:bz2",
+    "w:xz",
+    "x",
+    "x:",
+    "x:gz",
+    "x:bz2",
+    "x:xz",
+    "r|*",
+    "r|",
+    "r|gz",
+    "r|bz2",
+    "r|xz",
+    "w|",
+    "w|gz",
+    "w|bz2",
+    "w|xz",
+]
+tar_modes: tuple[TarMode, ...] = get_args(TarMode)
+
+
+ZipMode = Literal["r", "w", "a", "x"]
+zip_modes: tuple[ZipMode, ...] = get_args(ZipMode)
+
+
 @contextmanager
 def open_tar(
-    tar_path: str | bytes | os.PathLike,
-    mode: str = "r*:",
-    extract_path: str | bytes | os.PathLike | None = None,
+    tar_path: str | os.PathLike,
+    mode: TarMode = "r:*",
+    extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
     max_objects: int = OBJECT_THRESHOLD,
     max_size: int = SIZE_THRESHOLD,
@@ -666,9 +703,9 @@ def open_tar(
 
 @contextmanager
 def open_zip(
-    zip_path: str | bytes | os.PathLike,
-    mode: Literal["r", "w", "a", "x"] = "r",
-    extract_path: str | bytes | os.PathLike | None = None,
+    zip_path: str | os.PathLike,
+    mode: ZipMode = "r",
+    extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
     max_objects: int = OBJECT_THRESHOLD,
     max_size: int = SIZE_THRESHOLD,
@@ -696,7 +733,7 @@ def open_zip(
             zip.extractall("/extract")
 
     :param zip_path: Path to the zip archive.
-    :param mode: Mode to open the archive (default: `"r:*"`).
+    :param mode: Mode to open the archive (default: `"r"`).
     :param allow_overwrite: If `True`, allows overwriting existing files when
         checking the `extract_path`. (default: `False`).
     :param max_objects: Maximum number of files allowed in the archive. `None`
@@ -720,9 +757,9 @@ def open_zip(
 
 @contextmanager
 def open_archive(
-    archive: str | bytes | os.PathLike,
-    mode: str | None = None,
-    extract_path: str | bytes | os.PathLike | None = None,
+    archive: str | os.PathLike,
+    mode: ZipMode | TarMode | None = None,
+    extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
     max_objects: int = OBJECT_THRESHOLD,
     max_size: int = SIZE_THRESHOLD,
@@ -738,8 +775,8 @@ def open_archive(
     are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
     not found, default thresholds are used.
 
-    :param tar_path: Path to the archive.
-    :param mode: Mode to open the archive. If `None`, uses `"r:*"` for tar
+    :param archive: Path to the archive.
+    :param mode: Mode to open the archive. If `None`, uses `"r*:"` for tar
         files and `"r"` for zip files (default: `None`).
     :param extract_path: Directory to extract contents to. If `None`,
         extraction path validation is disabled (default: `None`).
@@ -757,26 +794,47 @@ def open_archive(
     """
     if tarfile.is_tarfile(archive):
         if mode is None:
-            mode = "r:*"
-        func = open_tar
+            tar_mode = "r:*"
+        elif mode in tar_modes:
+            tar_mode = mode
+        else:
+            raise ValueError("Invalid mode for opening a tar archive.")
+        try:
+            with open_tar(
+                archive,
+                tar_mode,
+                extract_path,
+                allow_overwrite,
+                max_objects,
+                max_size,
+                max_ratio,
+                **kwargs,
+            ) as arc:
+                yield arc
+        except Exception as e:
+            raise ExtractError(f"Failed to open '{archive}': {e}") from e
+
     elif zipfile.is_zipfile(archive):
         if mode is None:
-            mode = "r"
-        func = open_zip
+            zip_mode = "r"
+        elif mode in zip_modes:
+            zip_mode = mode
+        else:
+            raise ValueError("Invalid mode for opening a zip archive.")
+        try:
+            with open_zip(
+                archive,
+                zip_mode,
+                extract_path,
+                allow_overwrite,
+                max_objects,
+                max_size,
+                max_ratio,
+                **kwargs,
+            ) as arc:
+                yield arc
+        except Exception as e:
+            raise ExtractError(f"Failed to open '{archive}': {e}") from e
+
     else:
         raise ExtractError(f"File '{archive}' is not supported")
-
-    try:
-        with func(
-            archive,
-            mode,
-            extract_path,
-            allow_overwrite,
-            max_objects,
-            max_size,
-            max_ratio,
-            **kwargs,
-        ) as arc:
-            yield arc
-    except Exception as e:
-        raise ExtractError(f"Failed to open '{archive}': {e}") from e
