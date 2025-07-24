@@ -41,6 +41,8 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
     zipfile.ZIP_LZMA,
 }
 
+COMPRESSOR_NAMES: dict[int, str] = getattr(zipfile, "compressor_names", {})
+
 RATIO_THRESHOLD = CONFIG.max_ratio
 SIZE_THRESHOLD = CONFIG.max_size
 OBJECT_THRESHOLD = CONFIG.max_objects
@@ -378,7 +380,7 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
                 # been implemented should raise an ExtractError
                 raise ExtractError(
                     "Compression type not supported: "
-                    + str(zipfile.compressor_names.get(comp_type, comp_type))
+                    + str(COMPRESSOR_NAMES.get(comp_type, comp_type))
                 )
             self.update(member)
             yield member
@@ -638,11 +640,11 @@ TarMode = Literal[
     "w|bz2",
     "w|xz",
 ]
-tar_modes: tuple[TarMode, ...] = get_args(TarMode)
+TAR_MODES: tuple[TarMode, ...] = get_args(TarMode)
 
 
 ZipMode = Literal["r", "w", "a", "x"]
-zip_modes: tuple[ZipMode, ...] = get_args(ZipMode)
+ZIP_MODES: tuple[ZipMode, ...] = get_args(ZipMode)
 
 
 @contextmanager
@@ -795,7 +797,7 @@ def open_archive(
     if tarfile.is_tarfile(archive):
         if mode is None:
             tar_mode = "r:*"
-        elif mode in tar_modes:
+        elif mode in TAR_MODES:
             tar_mode = mode
         else:
             raise ValueError("Invalid mode for opening a tar archive.")
@@ -817,7 +819,7 @@ def open_archive(
     elif zipfile.is_zipfile(archive):
         if mode is None:
             zip_mode = "r"
-        elif mode in zip_modes:
+        elif mode in ZIP_MODES:
             zip_mode = mode
         else:
             raise ValueError("Invalid mode for opening a zip archive.")
