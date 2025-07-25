@@ -14,9 +14,6 @@ from archive_helpers.config import CONFIG
 from archive_helpers.archive_validator import TarValidator, ZipValidator
 from archive_helpers.exceptions import ExtractError
 
-RATIO_THRESHOLD = CONFIG.max_ratio
-SIZE_THRESHOLD = CONFIG.max_size
-OBJECT_THRESHOLD = CONFIG.max_objects
 
 TarMode = Literal[
     "r",
@@ -59,9 +56,9 @@ def open_tar(
     mode: TarMode = "r:*",
     extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
-    max_objects: int = OBJECT_THRESHOLD,
-    max_size: int = SIZE_THRESHOLD,
-    max_ratio: int = RATIO_THRESHOLD,
+    max_objects: int = CONFIG.max_objects,
+    max_size: int = CONFIG.max_size,
+    max_ratio: int = CONFIG.max_ratio,
     **kwargs: Any,
 ) -> Generator[tarfile.TarFile, None, None]:
     """Context manager wrapper for tarfile objects with validation.
@@ -115,9 +112,9 @@ def open_zip(
     mode: ZipMode = "r",
     extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
-    max_objects: int = OBJECT_THRESHOLD,
-    max_size: int = SIZE_THRESHOLD,
-    max_ratio: int = RATIO_THRESHOLD,
+    max_objects: int = CONFIG.max_objects,
+    max_size: int = CONFIG.max_size,
+    max_ratio: int = CONFIG.max_ratio,
     **kwargs: Any,
 ) -> Generator[zipfile.ZipFile, None, None]:
     """Context manager wrapper for zipfile objects with validation.
@@ -169,9 +166,9 @@ def open_archive(
     mode: ZipMode | TarMode | None = None,
     extract_path: str | os.PathLike | None = None,
     allow_overwrite: bool = False,
-    max_objects: int = OBJECT_THRESHOLD,
-    max_size: int = SIZE_THRESHOLD,
-    max_ratio: int = RATIO_THRESHOLD,
+    max_objects: int = CONFIG.max_objects,
+    max_size: int = CONFIG.max_size,
+    max_ratio: int = CONFIG.max_ratio,
     **kwargs: Any,
 ) -> Generator[tarfile.TarFile | zipfile.ZipFile, None, None]:
     """Context manager wrapper for archives with validation.

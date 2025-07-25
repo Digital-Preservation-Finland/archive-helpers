@@ -14,19 +14,14 @@ from archive_helpers.config import CONFIG
 from archive_helpers.exceptions import ExtractError
 
 
-RATIO_THRESHOLD = CONFIG.max_ratio
-SIZE_THRESHOLD = CONFIG.max_size
-OBJECT_THRESHOLD = CONFIG.max_objects
-
-
 def tarfile_extract(
     tar_path: str | os.PathLike,
     extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
-    max_objects: int | None = OBJECT_THRESHOLD,
-    max_size: int | None = SIZE_THRESHOLD,
-    max_ratio: int | None = RATIO_THRESHOLD,
+    max_objects: int | None = CONFIG.max_objects,
+    max_size: int | None = CONFIG.max_size,
+    max_ratio: int | None = CONFIG.max_ratio,
 ) -> None:
     """Decompress using tarfile module.
 
@@ -112,9 +107,9 @@ def zipfile_extract(
     extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
-    max_objects: int | None = OBJECT_THRESHOLD,
-    max_size: int | None = SIZE_THRESHOLD,
-    max_ratio: int | None = RATIO_THRESHOLD,
+    max_objects: int | None = CONFIG.max_objects,
+    max_size: int | None = CONFIG.max_size,
+    max_ratio: int | None = CONFIG.max_ratio,
 ) -> None:
     """Decompress using zipfile module.
 
@@ -165,9 +160,9 @@ def extract(
     extract_path: str | os.PathLike,
     allow_overwrite: bool = False,
     precheck: bool = True,
-    max_objects: int | None = OBJECT_THRESHOLD,
-    max_size: int | None = SIZE_THRESHOLD,
-    max_ratio: int | None = RATIO_THRESHOLD,
+    max_objects: int | None = CONFIG.max_objects,
+    max_size: int | None = CONFIG.max_size,
+    max_ratio: int | None = CONFIG.max_ratio,
 ) -> None:
     """Extract tar or zip archives.
 

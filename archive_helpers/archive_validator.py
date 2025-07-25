@@ -2,11 +2,11 @@
 
 
 from __future__ import annotations
-import stat
 from typing import Generator, Generic, TypeVar
 
 import tarfile
 import zipfile
+import stat
 import os
 
 from archive_helpers.config import CONFIG
@@ -51,10 +51,6 @@ SUPPORTED_ZIPFILE_COMPRESS_TYPES = {
 
 COMPRESSOR_NAMES: dict[int, str] = getattr(zipfile, "compressor_names", {})
 
-RATIO_THRESHOLD = CONFIG.max_ratio
-SIZE_THRESHOLD = CONFIG.max_size
-OBJECT_THRESHOLD = CONFIG.max_objects
-
 
 ArchiveT = TypeVar("ArchiveT", tarfile.TarFile, zipfile.ZipFile)
 MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo)
@@ -68,9 +64,9 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         archive: ArchiveT,
         extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD,
+        max_objects: int | None = CONFIG.max_objects,
+        max_size: int | None = CONFIG.max_size,
+        max_ratio: int | None = CONFIG.max_ratio,
     ) -> None:
         """Create an archive validator instance. Use `None` to disable max
         limits.
@@ -328,9 +324,9 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
         zipf: zipfile.ZipFile,
         extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD,
+        max_objects: int | None = CONFIG.max_objects,
+        max_size: int | None = CONFIG.max_size,
+        max_ratio: int | None = CONFIG.max_ratio,
     ) -> None:
         super().__init__(
             zipf,
@@ -368,9 +364,9 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
         tarf: tarfile.TarFile,
         extract_path: str | os.PathLike | None,
         allow_overwrite: bool = False,
-        max_objects: int | None = OBJECT_THRESHOLD,
-        max_size: int | None = SIZE_THRESHOLD,
-        max_ratio: int | None = RATIO_THRESHOLD,
+        max_objects: int | None = CONFIG.max_objects,
+        max_size: int | None = CONFIG.max_size,
+        max_ratio: int | None = CONFIG.max_ratio,
     ) -> None:
         super().__init__(
             tarf,
