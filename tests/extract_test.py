@@ -7,19 +7,21 @@ import zipfile
 import pytest
 from archive_helpers.extract import (
     ExtractError,
+    extract,
+    open_archive,
+)
+from archive_helpers.exceptions import (
     ObjectCountError,
     MemberNameError,
     MemberOverwriteError,
     MemberTypeError,
     ArchiveSizeError,
-    extract,
-    open_archive,
 )
 
 TAR_FILES = [
     ("source.tar", ""),
     ("source.tar.gz", "z"),
-    ("source.tar.bz2", "j")
+    ("source.tar.bz2", "j"),
 ]
 
 ARCHIVES = TAR_FILES + [("source.zip", "")]
