@@ -8,8 +8,8 @@ import pytest
 from archive_helpers.extract import (
     ExtractError,
     extract,
-    open_archive,
 )
+from archive_helpers.open import open_archive
 from archive_helpers.exceptions import (
     ObjectCountError,
     MemberNameError,
