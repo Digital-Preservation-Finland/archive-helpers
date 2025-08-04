@@ -87,7 +87,7 @@ def tarfile_extract(
         with tarfile.open(tar_path, "r|*") as tarf:
             try:
                 tarf.extractall(extract_path, filter="fully_trusted")
-            except TypeError:  # 'filer' does not exist
+            except TypeError:  # 'filter' does not exist
                 tarf.extractall(extract_path)
     else:
         # Read archive only once by extracting files on the fly
