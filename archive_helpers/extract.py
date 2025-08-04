@@ -102,6 +102,7 @@ def tarfile_extract(
                 max_ratio=max_ratio,
             )
 
+            # Iterating a TarValidator yields members after validating them
             for member in validator:
                 try:
                     tarf.extract(
@@ -161,7 +162,8 @@ def zipfile_extract(
             validator.validate_all()
             zipf.extractall(extract_path)
         else:
-            # Read archive only once by extracting files on the fly
+            # Read archive only once by extracting files on the fly.
+            # Iterating a ZipValidator yields members after validating them
             for member in validator:
                 zipf.extract(member, path=os.path.abspath(extract_path))
 
@@ -201,13 +203,13 @@ def extract(
     :returns: None
     """
     if tarfile.is_tarfile(archive):
-        func = tarfile_extract
+        extract_func = tarfile_extract
     elif zipfile.is_zipfile(archive):
-        func = zipfile_extract
+        extract_func = zipfile_extract
     else:
         raise ExtractError(f"File '{archive}' is not supported")
 
-    func(
+    extract_func(
         archive,
         extract_path=extract_path,
         allow_overwrite=allow_overwrite,

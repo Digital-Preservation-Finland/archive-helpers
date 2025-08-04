@@ -70,7 +70,7 @@ def open_tar(
     are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
     not found, default thresholds are used.
 
-    Usage::
+    **Usage**::
 
         # Iterate over members
         with open_tar("/path/to/tar.tar") as tar:
@@ -126,7 +126,7 @@ def open_zip(
     are loaded from `/etc/archive-helpers/archive-helpers.conf`. If the file is
     not found, default thresholds are used.
 
-    Usage::
+    **Usage**::
 
         # Iterate over members
         with open_zip("/path/to/zip.zip") as zip:

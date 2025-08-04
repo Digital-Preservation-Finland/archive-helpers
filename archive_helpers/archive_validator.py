@@ -2,6 +2,7 @@
 
 
 from __future__ import annotations
+from abc import ABCMeta, abstractmethod
 from typing import Generator, Generic, TypeVar
 
 import tarfile
@@ -56,8 +57,12 @@ ArchiveT = TypeVar("ArchiveT", tarfile.TarFile, zipfile.ZipFile)
 MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo)
 
 
-class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
-    """Base Class for on-the-fly or full validation of zip or tar archives."""
+class _BaseArchiveValidator(Generic[ArchiveT, MemberT], metaclass=ABCMeta):
+    """Base class for on-the-fly or full validation of zip or tar archives.
+
+    This is designed to be subclassed for zip or tar archives. It provides the
+    shared validation logic common to both formats.
+    """
 
     def __init__(
         self,
@@ -68,12 +73,13 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         max_size: int | None = CONFIG.max_size,
         max_ratio: int | None = CONFIG.max_ratio,
     ) -> None:
-        """Create an archive validator instance. Use `None` to disable max
-        limits.
+        """Create an archive validator instance. Use `None` to disable a max
+        limit check.
 
-        If not provided, max limits use values configured in
+        If not provided, max limits are taken from the configuration file
         `/etc/archive-helpers-archive-helpers-conf`. If this file is not
-        available, default values are used instead.
+        available, default values defined in `archive_helpers.config` are used
+        instead.
 
         :param archive: Opened archive object.
         :param extract_path: Directory where the archive is extracted. Use
@@ -94,26 +100,50 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         self.max_ratio = max_ratio
 
         self.archive_path = self._get_archive_path(archive)
-        self.object_count = 0
-        self.uncompressed_size = 0
         self.compressed_size = os.path.getsize(self.archive_path)
 
-    def validate_all(self) -> list[MemberT]:
-        """Fully validates the archive object by iterating through it.
+        # Calculated during validation
+        self.object_count = 0
+        self.uncompressed_size = 0
 
-        :returns: List containing the archive's members.
-        :raises ArchiveSizeError: If size or ratio limits are exceeded.
-        :raises ObjectCountError: If object count limit is exceeded.
+    def validate_all(self) -> list[MemberT]:
+        """Fully validates the archive object by iterating through all its
+        members.
+
+        This method is identical to::
+
+            for member in validator:
+                pass
+
+        since iterating yields validated members.
+
+        :returns: List containing the archive's validated members.
+        :raises ArchiveSizeError: If the archive's uncompressed size or
+            compression ratio exceeds limits.
+        :raises ObjectCountError: If the archive contains more objects than
+            allowed.
+        :raises MemberNameError: If a member's name points outside the
+            extraction path.
+        :raises MemberTypeError: If a member has an unsupported file type.
+        :raises MemberOverwriteError: If a member would overwrite an existing
+            file during extraction.
         """
         return list(self)
 
     def update(self, member: MemberT) -> None:
         """
-        Update validation state with a new member for on-the-fly validation.
+        Update internal validation state with a new archive member.
 
         :param member: A member object from the archive.
-        :raises ArchiveSizeError: If size or ratio limits are exceeded.
-        :raises ObjectCountError: If object count limit is exceeded.
+        :raises ArchiveSizeError: If the archive's uncompressed size or
+            compression ratio exceeds limits.
+        :raises ObjectCountError: If the archive contains more objects than
+            allowed.
+        :raises MemberNameError: If a member's name points outside the
+            extraction path.
+        :raises MemberTypeError: If a member has an unsupported file type.
+        :raises MemberOverwriteError: If a member would overwrite an existing
+            file during extraction.
         """
         self._validate_member(
             member=member,
@@ -160,14 +190,6 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
         if isinstance(archive, tarfile.TarFile):
             return str(archive.name)
         raise TypeError(f"Unsupported archive type: {type(archive)}")
-
-    def _update_counts(self, member: MemberT) -> None:
-        """Update `self.object_count` and `self.uncompressed_size`
-
-        This is implemented in child classes because `TarInfo` and `ZipInfo`
-        objects have different properties.
-        """
-        raise NotImplementedError
 
     def _validate_member(
         self,
@@ -305,19 +327,57 @@ class _BaseArchiveValidator(Generic[ArchiveT, MemberT]):
             if not allow_overwrite and os.path.isfile(fpath):
                 raise MemberOverwriteError(f"File '{filename}' already exists")
 
+    @abstractmethod
+    def _update_counts(self, member: MemberT) -> None:
+        """Update `self.object_count` and `self.uncompressed_size`."""
+        # Must be implemented by subclass because `TarInfo` and `ZipInfo`
+        # have different properties.
+
+    @abstractmethod
     def __iter__(self) -> Generator[MemberT]:
-        """Iterate over all members in the archive, validating each one.
+        """Iterate over all members of the archive. Members are yielded after
+        they are validated, so iterating over all members validates the
+        archive.
 
         :returns: Validated member object.
-        :raises ArchiveSizeError: If size or ratio limits are exceeded.
-        :raises ObjectCountError: If object count limit is exceeded.
+        :raises ArchiveSizeError: If the archive's uncompressed size or
+            compression ratio exceeds limits.
+        :raises ObjectCountError: If the archive contains more objects than
+            allowed.
+        :raises MemberNameError: If a member's name points outside the
+            extraction path.
+        :raises MemberTypeError: If a member has an unsupported file type.
+        :raises MemberOverwriteError: If a member would overwrite an existing
+            file during extraction.
         """
-        # Child classes implement __iter__()
-        raise NotImplementedError
+        # Implemented in subclass.
 
 
 class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
-    """Class for on-the-fly or full validation of zip archives."""
+    """Validator for zip archives. Supports both incremental and full
+    validation.
+
+    This class can be used to enforce constraints on zip files:
+    - Maximum number of contained files
+    - Maximum total uncompressed size
+    - Maximum compression ratio
+    - Supported compression types
+
+    **Usage**::
+
+        from archive_helpers.archive_validator import ZipValidator
+        from zipfile import ZipFile
+
+        zipf = ZipFile("path/to/archive.zip")
+        validator = ZipValidator(zipf)
+
+        # Validate members one by one...
+        for member in validator:
+            ...
+
+        # ...or validate the entire archive at once.
+        validator.validate_all()
+    """
 
     def __init__(
         self,
@@ -346,7 +406,7 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
         for member in self.archive.infolist():
             comp_type = member.compress_type
             if comp_type not in SUPPORTED_ZIPFILE_COMPRESS_TYPES:
-                # Rare compression types like ppmd amd deflate64 that have not
+                # Rare compression types like ppmd and deflate64 that have not
                 # been implemented should raise an ExtractError
                 raise ExtractError(
                     "Compression type not supported: "
@@ -357,7 +417,30 @@ class ZipValidator(_BaseArchiveValidator[zipfile.ZipFile, zipfile.ZipInfo]):
 
 
 class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
-    """Class for on-the-fly or full validation of tar archives."""
+    """Validator for tar archives. Supports both incremental and full
+    validation.
+
+    This class can be used to enforce constraints on tar files:
+    - Maximum number of contained files
+    - Maximum total uncompressed size
+    - Maximum compression ratio
+
+    **Usage**::
+
+        from archive_helpers.archive_validator import TarValidator
+        from tarfile import TarFile
+
+        tarf = TarFile.open("path/to/tar.tar")
+        validator = TarValidator(tarf)
+
+        # Validate members one by one...
+        for member in validator:
+            ...
+
+        # ...or validate the entire archive at once.
+        validator.validate_all()
+
+    """
 
     def __init__(
         self,
