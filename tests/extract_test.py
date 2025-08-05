@@ -324,13 +324,15 @@ def test_tar_max_objects(size_ok, archive, tmp_path, precheck, max_objects):
     [
         ("tests/data/zip_bomb_220MB.zip", False),
         ("tests/data/zip_bomb_220MB.zip", True),
+        ("tests/data/tar_bomb_100MB.tar.gz", False),
+        ("tests/data/tar_bomb_100MB.tar.gz", True),
     ],
 )
-def test_zip_bomb_filesize_is_detected(archive, precheck, tmp_path):
+def test_bomb_compression_ratio_is_detected(archive, precheck, tmp_path):
     """Test that zip bombs with too large size are detected"""
     with pytest.raises(ArchiveSizeError) as error:
         extract(archive, tmp_path, True, precheck)
-    assert "exceeds the allowed maximum" in str(error.value)
+    assert "compression ratio" in str(error.value).lower()
 
 
 @pytest.mark.parametrize(
@@ -340,7 +342,7 @@ def test_zip_bomb_filesize_is_detected(archive, precheck, tmp_path):
         ("tests/data/zip_bomb_500_files.zip", True),
     ],
 )
-def test_zip_bomb_filecount_is_detected(archive, precheck, tmp_path):
+def test_bomb_filecount_is_detected(archive, precheck, tmp_path):
     """Test that zip bombs with too many files are detected."""
     with pytest.raises(ObjectCountError) as error:
         extract(archive, tmp_path, True, precheck, max_objects=400)
@@ -352,6 +354,8 @@ def test_zip_bomb_filecount_is_detected(archive, precheck, tmp_path):
     [
         ("tests/data/zip_bomb_220MB.zip", False),
         ("tests/data/zip_bomb_220MB.zip", True),
+        ("tests/data/tar_bomb_100MB.tar.gz", False),
+        ("tests/data/tar_bomb_100MB.tar.gz", True),
     ],
 )
 def test_zip_bomb_total_size_is_detected(archive, precheck, tmp_path):

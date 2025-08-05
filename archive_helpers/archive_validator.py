@@ -1,6 +1,5 @@
 """Validator classes for tar and zip archives."""
 
-
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Generator, Generic, TypeVar
