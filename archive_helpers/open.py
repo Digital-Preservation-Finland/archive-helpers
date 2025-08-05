@@ -54,8 +54,6 @@ ZIP_MODES: tuple[ZipMode, ...] = get_args(ZipMode)
 def open_tar(
     tar_path: str | os.PathLike,
     mode: TarMode = "r:*",
-    extract_path: str | os.PathLike | None = None,
-    allow_overwrite: bool = False,
     max_objects: int = CONFIG.max_objects,
     max_size: int = CONFIG.max_size,
     max_ratio: int = CONFIG.max_ratio,
@@ -72,21 +70,11 @@ def open_tar(
 
     **Usage**::
 
-        # Iterate over members
-        with open_tar("/path/to/tar.tar") as tar:
-            for member in tar:
-                ...
-
-        # Extract contents
-        with open_tar("/path/to/tar.tar", extract_path="/extract") as tar:
-            tar.extractall("/extract", filter="fully_trusted")
+        with open_tar("/path/to/tar.tar") as tarf:
+            ...
 
     :param tar_path: Path to the tar archive.
     :param mode: Mode to open the archive (default: `"r:*"`).
-    :param extract_path: Directory to extract contents to. If `None`,
-        extraction path validation is disabled (default: `None`).
-    :param allow_overwrite: If `True`, allows overwriting existing files when
-        checking the `extract_path`. (default: `False`).
     :param max_objects: Maximum number of files allowed in the archive. `None`
         disables the check (default: 100000)
     :param max_size: Maximum total size of extracted files in bytes. `None`
@@ -98,7 +86,11 @@ def open_tar(
     """
     tarf = tarfile.open(name=tar_path, mode=mode, **kwargs)
     TarValidator(
-        tarf, extract_path, allow_overwrite, max_objects, max_size, max_ratio
+        tarf=tarf,
+        extract_path=None,
+        max_objects=max_objects,
+        max_size=max_size,
+        max_ratio=max_ratio,
     ).validate_all()
     try:
         yield tarf
@@ -110,8 +102,6 @@ def open_tar(
 def open_zip(
     zip_path: str | os.PathLike,
     mode: ZipMode = "r",
-    extract_path: str | os.PathLike | None = None,
-    allow_overwrite: bool = False,
     max_objects: int = CONFIG.max_objects,
     max_size: int = CONFIG.max_size,
     max_ratio: int = CONFIG.max_ratio,
@@ -128,19 +118,11 @@ def open_zip(
 
     **Usage**::
 
-        # Iterate over members
-        with open_zip("/path/to/zip.zip") as zip:
-            for member in zip.infolist():
-                ...
-
-        # Extract contents
-        with open_zip("/path/to/zip.zip", extract_path="/extract") as zip:
-            zip.extractall("/extract")
+        with open_zip("/path/to/zip.zip") as zipf:
+            ...
 
     :param zip_path: Path to the zip archive.
     :param mode: Mode to open the archive (default: `"r"`).
-    :param allow_overwrite: If `True`, allows overwriting existing files when
-        checking the `extract_path`. (default: `False`).
     :param max_objects: Maximum number of files allowed in the archive. `None`
         disables the check (default 100000).
     :param max_size: Maximum total size of extracted files in bytes. `None`
@@ -152,7 +134,11 @@ def open_zip(
     """
     zipf = zipfile.ZipFile(file=zip_path, mode=mode, **kwargs)
     ZipValidator(
-        zipf, extract_path, allow_overwrite, max_objects, max_size, max_ratio
+        zipf=zipf,
+        extract_path=None,
+        max_objects=max_objects,
+        max_size=max_size,
+        max_ratio=max_ratio,
     ).validate_all()
     try:
         yield zipf
@@ -164,8 +150,6 @@ def open_zip(
 def open_archive(
     archive: str | os.PathLike,
     mode: ZipMode | TarMode | None = None,
-    extract_path: str | os.PathLike | None = None,
-    allow_overwrite: bool = False,
     max_objects: int = CONFIG.max_objects,
     max_size: int = CONFIG.max_size,
     max_ratio: int = CONFIG.max_ratio,
@@ -183,10 +167,6 @@ def open_archive(
     :param archive: Path to the archive.
     :param mode: Mode to open the archive. If `None`, uses `"r*:"` for tar
         files and `"r"` for zip files (default: `None`).
-    :param extract_path: Directory to extract contents to. If `None`,
-        extraction path validation is disabled (default: `None`).
-    :param allow_overwrite: If `True`, allows overwriting existing files when
-        checking the `extract_path`. (default: `False`).
     :param max_objects: Maximum number of files allowed in the archive. `None`
         disables the check (default: 100000)
     :param max_size: Maximum total size of extracted files in bytes. `None`
@@ -208,8 +188,6 @@ def open_archive(
             with open_tar(
                 archive,
                 tar_mode,
-                extract_path,
-                allow_overwrite,
                 max_objects,
                 max_size,
                 max_ratio,
@@ -230,8 +208,6 @@ def open_archive(
             with open_zip(
                 archive,
                 zip_mode,
-                extract_path,
-                allow_overwrite,
                 max_objects,
                 max_size,
                 max_ratio,

@@ -379,22 +379,6 @@ def test_zip_bomb_total_size_is_detected(archive, precheck, tmp_path):
         ("tests/data/zip_folder_and_three_files.zip", False),
     ],
 )
-def test_open_archive_extract(archive, is_tar, tmp_path):
-    """Test that open_archive can extract a tar archive."""
-    with open_archive(archive, extract_path=tmp_path) as arc:
-        if is_tar:
-            arc.extractall(tmp_path, filter="fully_trusted")
-        else:
-            arc.extractall(tmp_path)
-
-
-@pytest.mark.parametrize(
-    ("archive", "is_tar"),
-    [
-        ("tests/data/tar_folder_and_three_files.tar", True),
-        ("tests/data/zip_folder_and_three_files.zip", False),
-    ],
-)
 def test_open_archive_iterate_members(archive, is_tar):
     """Test that open_archive can be used to iterate members."""
     with open_archive(archive) as arc:
