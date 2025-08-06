@@ -9,7 +9,7 @@ from archive_helpers.extract import (
     ExtractError,
     extract,
 )
-from archive_helpers.open import open_archive
+from archive_helpers.open import open_archive, open_tar
 from archive_helpers.exceptions import (
     ObjectCountError,
     MemberNameError,
@@ -388,3 +388,11 @@ def test_open_archive_iterate_members(archive, is_tar):
         else:
             for member in arc.infolist():
                 assert isinstance(member, zipfile.ZipInfo)
+
+
+def test_tarfile_next_after_open_tar():
+    """Test that open_tar yields members properly."""
+    with open_tar("tests/data/tar_folder_and_three_files.tar") as tarf:
+        member = tarf.next()
+        assert member is not None
+        assert isinstance(member, tarfile.TarInfo)

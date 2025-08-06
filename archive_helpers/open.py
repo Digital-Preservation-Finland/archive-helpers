@@ -84,14 +84,15 @@ def open_tar(
     :param kwargs: Additional keyword arguments passed to `tarfile.open()`.
     :returns: A `TarFile` instance.
     """
+    with tarfile.open(name=tar_path, mode=mode, **kwargs) as tarf:
+        TarValidator(
+            tarf=tarf,
+            extract_path=None,
+            max_objects=max_objects,
+            max_size=max_size,
+            max_ratio=max_ratio,
+        ).validate_all()
     tarf = tarfile.open(name=tar_path, mode=mode, **kwargs)
-    TarValidator(
-        tarf=tarf,
-        extract_path=None,
-        max_objects=max_objects,
-        max_size=max_size,
-        max_ratio=max_ratio,
-    ).validate_all()
     try:
         yield tarf
     finally:
