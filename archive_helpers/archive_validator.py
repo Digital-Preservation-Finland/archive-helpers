@@ -468,3 +468,67 @@ class TarValidator(_BaseArchiveValidator[tarfile.TarFile, tarfile.TarInfo]):
         for member in self.archive:
             self.update(member)
             yield member
+
+
+def validate(
+    archive: str | os.PathLike,
+    extract_path: str | os.PathLike | None = None,
+    allow_overwrite: bool = False,
+    max_objects: int | None = CONFIG.max_objects,
+    max_size: int | None = CONFIG.max_size,
+    max_ratio: int | None = CONFIG.max_ratio,
+) -> None:
+    """Validate tar or zip archives. Raises an exception if the archive is not
+    valid.
+
+    If no values are provided for `max_objects`, `max_size` or `max_ratio`,
+    they use values from `/etc/archive-helpers/archive-helpers.conf`.
+    If reading the config fails, default values are used instead.
+
+    :param archive: Path to the tar or zip archive
+    :param extract_path: Directory where the archive would be extracted. Use
+        `None` to disable related checks.
+    :param allow_overwrite: Boolean to allow overwriting existing files
+        without raising an error (defaults to False)
+    :param max_objects: Limit how many objects the tar file can have. Use
+        `None` for no limit. Default limit is 100000.
+    :param max_size: Limit how large the decompressed archive can be. Use
+        `None` for no limit. Default limit is 4TB.
+    :param max_ratio: Limit the archive's compression ratio. For zip archives,
+        in addition to checking the entire archive, each member is also checked
+        individually. Use `None` for no limit. Default limit is 100.
+    :raises ArchiveSizeError: If the archive's uncompressed size or
+        compression ratio exceeds limits.
+    :raises ObjectCountError: If the archive contains more objects than
+        allowed.
+    :raises MemberNameError: If a member's name points outside the
+        extraction path.
+    :raises MemberTypeError: If a member has an unsupported file type.
+    :raises MemberOverwriteError: If a member would overwrite an existing
+        file during extraction.
+    :raises ExtractError: If extracting the file is not supported.
+    :returns: None
+    """
+
+    if tarfile.is_tarfile(archive):
+        with tarfile.open(archive) as tarf:
+            TarValidator(
+                tarf=tarf,
+                extract_path=extract_path,
+                allow_overwrite=allow_overwrite,
+                max_objects=max_objects,
+                max_size=max_size,
+                max_ratio=max_ratio,
+            ).validate_all()
+    elif zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as zipf:
+            ZipValidator(
+                zipf=zipf,
+                extract_path=extract_path,
+                allow_overwrite=allow_overwrite,
+                max_objects=max_objects,
+                max_size=max_size,
+                max_ratio=max_ratio,
+            ).validate_all()
+    else:
+        raise ExtractError(f"File '{archive}' is not supported")
