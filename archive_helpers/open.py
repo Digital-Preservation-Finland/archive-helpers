@@ -11,7 +11,7 @@ import tarfile
 from contextlib import contextmanager
 
 from archive_helpers.config import CONFIG
-from archive_helpers.archive_validator import TarValidator, ZipValidator
+from archive_helpers.validator import TarValidator, ZipValidator
 from archive_helpers.exceptions import ExtractError
 
 

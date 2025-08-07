@@ -9,7 +9,7 @@ import tarfile
 import zipfile
 
 
-from archive_helpers.archive_validator import TarValidator, ZipValidator
+from archive_helpers.validator import TarValidator, ZipValidator
 from archive_helpers.config import CONFIG
 
 # TODO(KDKPAS-3627): Some other repos import exceptions from here, since
