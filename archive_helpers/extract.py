@@ -12,9 +12,9 @@ import zipfile
 from archive_helpers.archive_validator import TarValidator, ZipValidator
 from archive_helpers.config import CONFIG
 
-# TODO: Some other repos import exceptions from here, since exceptions were
-# originally defined here. These unused imports should be removed when other
-# repos have been updated.
+# TODO(KDKPAS-3627): Some other repos import exceptions from here, since
+# exceptions were originally defined here. These unused imports should be
+# removed when other repos have been updated.
 from archive_helpers.exceptions import (  # noqa: F401
     ExtractError,
     ObjectCountError,
