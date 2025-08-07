@@ -16,7 +16,7 @@ Installation using RPM packages (preferred)
 Installation on Linux distributions is done by using the RPM Package Manager.
 See how to `configure the PAS-jakelu RPM repositories`_ to setup necessary software sources.
 
-.. _configure the PAS-jakelu RPM repositories: https://www.digitalpreservation.fi/user_guide/installation_of_tools 
+.. _configure the PAS-jakelu RPM repositories: https://www.digitalpreservation.fi/user_guide/installation_of_tools
 
 After the repository has been added, the package can be installed by running the following command::
 
@@ -25,17 +25,43 @@ After the repository has been added, the package can be installed by running the
 Usage
 -----
 
-Archive helpers provides :code:`archive_helpers.extract.extract` function for
-checking untrusted zip or tar archives and extracting them. Simply run::
+Archive Helpers provides functions to validate and extract untrusted archives safely.
+
+The ``archive_helpers.extract.extract`` function can be used to
+check untrusted zip or tar archives and extract them. Simply run::
 
     >>> from archive_helpers.extract import extract
     >>> extract("<archive_path>", "<extract_path>")
+
+The ``archive_helpers.validator.validate`` function can be used to
+validate untrusted zip or tar archives without extracting them::
+
+    >>> from archive_helpers.validator import validate
+    >>> validate("<archive_path>")
+
+By default, in addition to validation, both functions enforce thresholds for:
+
+- maximum amount of objects
+- maximum uncompressed size
+- maximum compression ratio
+
+These can be set to custom values::
+
+    >>> extract("<archive_path>", max_objects=123, max_size=456, max_ratio=789)
+
+Or disabled entirely::
+
+    >>> validate("<archive_path>", max_objects=None, max_size=None, max_ratio=None)
+
+The default threshold values can be set in the configuration file located at
+``/etc/archive_helpers/archive_helpers.conf``.
+
 
 Installation using Python Virtualenv for development purposes
 -------------------------------------------------------------
 
 Create a virtual environment::
-    
+
     python3 -m venv venv
 
 Run the following to activate the virtual environment::
