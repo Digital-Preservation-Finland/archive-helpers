@@ -17,6 +17,7 @@ from archive_helpers.exceptions import (
     MemberTypeError,
     ArchiveSizeError,
 )
+from archive_helpers.validator import validate
 
 TAR_FILES = [
     ("source.tar", ""),
@@ -396,3 +397,64 @@ def test_tarfile_next_after_open_tar():
         member = tarf.next()
         assert member is not None
         assert isinstance(member, tarfile.TarInfo)
+
+
+@pytest.mark.parametrize(
+    ("archive", "error", "settings", "message", "use_tmpdir"),
+    [
+        ("tests/conftest.py", ExtractError, {}, "not supported", False),
+        (
+            "tests/data/zip_ppmd_compression.zip",
+            ExtractError,
+            {},
+            "compression type",
+            False,
+        ),
+        (
+            "tests/data/zip_bomb_500_files.zip",
+            ObjectCountError,
+            {"max_objects": 499},
+            "number of objects",
+            False,
+        ),
+        (
+            "tests/data/zip_bomb_220MB.zip",
+            ArchiveSizeError,
+            {},
+            "compression ratio",
+            False,
+        ),
+        (
+            "tests/data/tar_bomb_100MB.tar.gz",
+            ArchiveSizeError,
+            {"max_ratio": None, "max_size": 99 * 1024**2},
+            "uncompressed size limit",
+            False,
+        ),
+        (
+            "tests/data/abspath.tar",
+            MemberNameError,
+            {},
+            "invalid file path",
+            True,
+        ),
+    ],
+)
+def test_validate_function_invalid_archives(
+    archive, error, settings, message, use_tmpdir, tmpdir
+):
+    """Test that validating an invalid archive raises the correct error."""
+    if not use_tmpdir:
+        tmpdir = None
+    with pytest.raises(error) as err:
+        validate(archive, extract_path=tmpdir, **settings)
+    assert message in str(err.value).lower()
+
+
+@pytest.mark.parametrize(
+    ("archive"),
+    [("tests/data/tar_three_files.tar"), ("tests/data/zip_three_files.zip")],
+)
+def test_validate_function_valid_archives(archive):
+    """"Test validate function with valid archives."""
+    validate(archive)
