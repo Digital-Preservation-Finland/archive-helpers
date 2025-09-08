@@ -11,18 +11,7 @@ import zipfile
 
 from archive_helpers.validator import TarValidator, ZipValidator
 from archive_helpers.config import CONFIG
-
-# TODO(KDKPAS-3627): Some other repos import exceptions from here, since
-# exceptions were originally defined here. These unused imports should be
-# removed when other repos have been updated.
-from archive_helpers.exceptions import (  # noqa: F401
-    ExtractError,
-    ObjectCountError,
-    MemberNameError,
-    MemberTypeError,
-    MemberOverwriteError,
-    ArchiveSizeError,
-)
+from archive_helpers.exceptions import ExtractError
 
 
 def tarfile_extract(
