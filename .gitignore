@@ -37,3 +37,4 @@ archive.tar
 tmp
 tags
 benchmark/
+archive_helpers/_version.py
