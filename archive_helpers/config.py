@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 DEFAULT_RATIO_THRESHOLD = 100
 DEFAULT_SIZE_THRESHOLD = 4 * 1024**4
-DEFAULT_OBJECT_THRESHOLD = 10**5
+DEFAULT_OBJECT_THRESHOLD = 50002
 CONFIG_PATH = "/etc/archive-helpers/archive-helpers.conf"
 
 
