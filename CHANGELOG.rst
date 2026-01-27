@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+2.1.0 - 2026-01-27
+------------------
+
+Changed
+^^^^^^^
+
+- Change the default value for max objects to 50002 (50000 objects + mets and
+  signature), as per our specifications.
+  
+
 2.0.0 - 2025-10-02
 ------------------
 
