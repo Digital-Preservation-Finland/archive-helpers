@@ -91,16 +91,38 @@ def tarfile_extract(
                 max_ratio=max_ratio,
             )
 
+            directories = []
+
             # Iterating a TarValidator yields members after validating them
             for member in validator:
                 try:
+                    set_attrs = True
+                    # Do not set attributes for directories: this is
+                    # done later, in case the directories are read-only.
+                    if member.isdir():
+                        set_attrs = False
+                        directories.append(member)
                     tarf.extract(
                         member,
                         path=extract_abs_path,
+                        set_attrs=set_attrs,
                         filter="fully_trusted",
                     )
                 except TypeError:  # 'filter' does not exist
-                    tarf.extract(member, path=extract_abs_path)
+                    tarf.extract(
+                        member,
+                        path=extract_abs_path,
+                        set_attrs=set_attrs
+                    )
+                # except PermissionError:
+                #    print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+
+            # Set correct owner, mtime annd filemode on directories.
+            for member in directories:
+                member_path = os.path.join(extract_abs_path, member.name)
+                tarf.chown(member, member_path, numeric_owner=False)
+                tarf.chmod(member, member_path)
+                tarf.utime(member, member_path)
 
 
 def zipfile_extract(

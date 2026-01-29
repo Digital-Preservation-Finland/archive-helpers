@@ -458,3 +458,52 @@ def test_validate_function_invalid_archives(
 def test_validate_function_valid_archives(archive):
     """"Test validate function with valid archives."""
     validate(archive)
+
+
+@pytest.mark.parametrize(
+    ("archive", "precheck"),
+    [
+        ("tests/data/tar_folders_readonly.tar.gz", False),
+        ("tests/data/tar_folders_readonly.tar.gz", True),
+        ("tests/data/zip_folders_readonly.zip", False),
+        ("tests/data/zip_folders_readonly.zip", True),
+    ],
+)
+def test_extract_readonly(archive, precheck, tmpdir):
+    """Test that read-only content can be extracted. After extraction,
+    the directories and files should retain the original mode.
+    """
+    # First check the original modes for directories and files
+    dst_path_compare = tmpdir.join("destination-compare")
+    os.mkdir(dst_path_compare)
+    ext = os.path.splitext(os.path.basename(archive))[1]
+    if ext == '.gz':
+        subprocess.call(
+            ["tar", "xvzf", archive, "-C", dst_path_compare]
+        )
+    else:
+        subprocess.call(
+            ["unzip", archive, "-d", dst_path_compare]
+        )
+
+    assert len(dst_path_compare.listdir()) == 1
+    assert len(dst_path_compare.join("dir1").listdir()) == 2
+    assert dst_path_compare.join("dir1/file1").check()
+
+    dir1_perm_orig = os.stat(dst_path_compare.join("dir1")).st_mode
+    file1_perm_orig = os.stat(dst_path_compare.join("dir1/file1")).st_mode
+
+    # Now test the extract function
+    dst_path = tmpdir.join("destination")
+    extract(archive, str(dst_path), precheck=precheck)
+
+    assert len(dst_path.listdir()) == 1
+    assert len(dst_path.join("dir1").listdir()) == 2
+    assert dst_path.join("dir1/file1").check()
+
+    dir1_perm = os.stat(dst_path.join("dir1")).st_mode
+    file1_perm = os.stat(dst_path.join("dir1/file1")).st_mode
+
+    # Make sure the modes match the original ones
+    assert dir1_perm == dir1_perm_orig
+    assert file1_perm == file1_perm_orig
