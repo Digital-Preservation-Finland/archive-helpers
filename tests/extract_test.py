@@ -463,10 +463,10 @@ def test_validate_function_valid_archives(archive):
 @pytest.mark.parametrize(
     ("archive", "precheck"),
     [
-        ("tests/data/tar_folders_readonly.tar.gz", False),
-        ("tests/data/tar_folders_readonly.tar.gz", True),
-        ("tests/data/zip_folders_readonly.zip", False),
-        ("tests/data/zip_folders_readonly.zip", True),
+        ("tests/data/tar_dirs_readonly.tar.gz", False),
+        ("tests/data/tar_dirs_readonly.tar.gz", True),
+        ("tests/data/zip_dirs_readonly.zip", False),
+        ("tests/data/zip_dirs_readonly.zip", True),
     ],
 )
 def test_extract_readonly(archive, precheck, tmpdir):

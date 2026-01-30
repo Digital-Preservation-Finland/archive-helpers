@@ -114,8 +114,6 @@ def tarfile_extract(
                         path=extract_abs_path,
                         set_attrs=set_attrs
                     )
-                # except PermissionError:
-                #    print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 
             # Set correct owner, mtime annd filemode on directories.
             for member in directories:
