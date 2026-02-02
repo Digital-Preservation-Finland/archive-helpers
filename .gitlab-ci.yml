@@ -9,4 +9,5 @@ include:
     file:
       - '/pipeline/common.yml'
       - '/pipeline/fddps.yml'
+      - '/pipeline/kppas.yml'
       - '/pipeline/sapa.yml'
