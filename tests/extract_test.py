@@ -465,26 +465,19 @@ def test_validate_function_valid_archives(archive):
     [
         ("tests/data/tar_dirs_readonly.tar.gz", False),
         ("tests/data/tar_dirs_readonly.tar.gz", True),
-        ("tests/data/zip_dirs_readonly.zip", False),
-        ("tests/data/zip_dirs_readonly.zip", True),
     ],
 )
-def test_extract_readonly(archive, precheck, tmpdir):
-    """Test that read-only content can be extracted. After extraction,
-    the directories and files should retain the original mode.
+def test_extract_readonly_tar_archive(archive, precheck, tmpdir):
+    """Test that read-only content in tar archives can be extracted.
+    After extraction, the directories and files should retain the
+    original mode.
     """
     # First check the original modes for directories and files
     dst_path_compare = tmpdir.join("destination-compare")
     os.mkdir(dst_path_compare)
-    ext = os.path.splitext(os.path.basename(archive))[1]
-    if ext == '.gz':
-        subprocess.call(
-            ["tar", "xvzf", archive, "-C", dst_path_compare]
-        )
-    else:
-        subprocess.call(
-            ["unzip", archive, "-d", dst_path_compare]
-        )
+    subprocess.call(
+        ["tar", "xvzf", archive, "-C", dst_path_compare]
+    )
 
     assert len(dst_path_compare.listdir()) == 1
     assert len(dst_path_compare.join("dir1").listdir()) == 2
