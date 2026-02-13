@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-
 import errno
 import os
 import tarfile
 import zipfile
+from typing import TYPE_CHECKING
 
-
-from archive_helpers.validator import TarValidator, ZipValidator
 from archive_helpers.config import CONFIG
 from archive_helpers.exceptions import ExtractError
+from archive_helpers.validator import TarValidator, ZipValidator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def tarfile_extract(
@@ -22,7 +24,8 @@ def tarfile_extract(
     max_objects: int | None = CONFIG.max_objects,
     max_size: int | None = CONFIG.max_size,
     max_ratio: int | None = CONFIG.max_ratio,
-) -> None:
+    filenames: Iterable[str] | None = None,
+) -> int:
     """Decompress using tarfile module.
 
     :param tar_path: Path to the tar archive
@@ -41,7 +44,9 @@ def tarfile_extract(
     :param max_ratio: Limit the archive's compression ratio. This is *only*
         checked for the entire archive. Use `None` for no limit. Default limit
         is 100.
-    :returns: None
+    :param filenames: List of filenames to extract. Use `None` to extract all
+        files. Defaults to `None`.
+    :returns: Number of files extracted.
     """
     if not tarfile.is_tarfile(tar_path):
         raise ExtractError("File is not a tar archive")
@@ -62,6 +67,7 @@ def tarfile_extract(
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
 
+    file_count = 0
     if precheck:
         with tarfile.open(tar_path, "r|*") as tarf:
             validator = TarValidator(
@@ -72,12 +78,29 @@ def tarfile_extract(
                 max_size=max_size,
                 max_ratio=max_ratio,
             )
-            validator.validate_all()
+            valid_members = validator.validate_all()
         with tarfile.open(tar_path, "r|*") as tarf:
-            try:
-                tarf.extractall(extract_path, filter="fully_trusted")
-            except TypeError:  # 'filter' does not exist
-                tarf.extractall(extract_path)
+            if filenames is None:
+                try:
+                    tarf.extractall(extract_path, filter="fully_trusted")
+                except TypeError:  # 'filter' does not exist
+                    tarf.extractall(extract_path)
+            else:
+                members_to_extract = [
+                    member
+                    for member in valid_members
+                    if member.name.split("/")[-1] in filenames
+                ]
+                try:
+                    tarf.extractall(
+                        extract_path,
+                        members=members_to_extract,
+                        filter="fully_trusted",
+                    )
+                except TypeError:
+                    tarf.extractall(extract_path, members=members_to_extract)
+                file_count = len(members_to_extract)
+
     else:
         # Read archive only once by extracting files on the fly
         extract_abs_path = os.path.abspath(extract_path)
@@ -95,6 +118,11 @@ def tarfile_extract(
 
             # Iterating a TarValidator yields members after validating them
             for member in validator:
+                if not (
+                    filenames is None
+                    or member.name.split("/")[-1] in filenames
+                ):
+                    continue
                 try:
                     set_attrs = True
                     # Do not set attributes for directories: this is
@@ -114,6 +142,7 @@ def tarfile_extract(
                         path=extract_abs_path,
                         set_attrs=set_attrs
                     )
+                file_count += 1
 
             # Set correct owner, mtime annd filemode on directories.
             for member in directories:
@@ -121,6 +150,7 @@ def tarfile_extract(
                 tarf.chown(member, member_path, numeric_owner=False)
                 tarf.chmod(member, member_path)
                 tarf.utime(member, member_path)
+    return file_count
 
 
 def zipfile_extract(
@@ -131,7 +161,8 @@ def zipfile_extract(
     max_objects: int | None = CONFIG.max_objects,
     max_size: int | None = CONFIG.max_size,
     max_ratio: int | None = CONFIG.max_ratio,
-) -> None:
+    filenames: Iterable | None = None,
+) -> int:
     """Decompress using zipfile module.
 
     :param zip_path: Path to the zip archive
@@ -150,14 +181,17 @@ def zipfile_extract(
     :param max_ratio: Limit the archive's compression ratio. This is checked
         for the entire archive and for each member of the archive. Use `None`
         for no limit. Default limit is 100.
+    :param filenames: List of filenames to extract. Use `None` to extract all
+        files. Defaults to `None`.
     :raises ArchiveSizeError: If the uncompressed archive is too large, or has
         too large compression ratio.
     :raises ObjectCountError: If the archive has too many objects.
-    :returns: None
+    :returns: Number of files extracted.
     """
     if not zipfile.is_zipfile(zip_path):
         raise ExtractError("File is not a zip archive")
 
+    file_count = 0
     with zipfile.ZipFile(zip_path) as zipf:
         validator = ZipValidator(
             zipf=zipf,
@@ -168,13 +202,33 @@ def zipfile_extract(
             max_ratio=max_ratio,
         )
         if precheck:
-            validator.validate_all()
-            zipf.extractall(extract_path)
+            valid_members = validator.validate_all()
+            if filenames is None:
+                zipf.extractall(extract_path)
+                file_count = len(valid_members)
+            else:
+                members_to_extract = [
+                    member
+                    for member in valid_members
+                    if member.filename.split("/")[-1] in filenames
+                ]
+                zipf.extractall(
+                    path=os.path.abspath(extract_path),
+                    members=members_to_extract,
+                )
+                file_count = len(members_to_extract)
+
         else:
             # Read archive only once by extracting files on the fly.
             # Iterating a ZipValidator yields members after validating them
             for member in validator:
-                zipf.extract(member, path=os.path.abspath(extract_path))
+                if (
+                    filenames is None
+                    or member.filename.split("/")[-1] in filenames
+                ):
+                    zipf.extract(member, path=os.path.abspath(extract_path))
+                    file_count += 1
+        return file_count
 
 
 def extract(
@@ -185,7 +239,8 @@ def extract(
     max_objects: int | None = CONFIG.max_objects,
     max_size: int | None = CONFIG.max_size,
     max_ratio: int | None = CONFIG.max_ratio,
-) -> None:
+    filenames: Iterable[str] | None = None,
+) -> int:
     """Extract tar or zip archives.
 
     If no values are provided for `max_objects`, `max_size` or `max_ratio`,
@@ -208,8 +263,10 @@ def extract(
     :param max_ratio: Limit the archive's compression ratio. For zip archives,
         in addition to checking the entire archive, each member is also checked
         individually. Use `None` for no limit. Default limit is 100.
+    :param filenames: List of filenames to extract. Use `None` to extract all
+        files. Default is `None`.
     :raises ExtractError: If extracting file is not supported.
-    :returns: None
+    :returns: Number of extracted files.
     """
     if tarfile.is_tarfile(archive):
         extract_func = tarfile_extract
@@ -218,7 +275,7 @@ def extract(
     else:
         raise ExtractError(f"File '{archive}' is not supported")
 
-    extract_func(
+    return extract_func(
         archive,
         extract_path=extract_path,
         allow_overwrite=allow_overwrite,
@@ -226,4 +283,5 @@ def extract(
         max_objects=max_objects,
         max_size=max_size,
         max_ratio=max_ratio,
+        filenames=filenames
     )

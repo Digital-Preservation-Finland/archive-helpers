@@ -5,18 +5,18 @@ import tarfile
 import zipfile
 
 import pytest
+from archive_helpers.exceptions import (
+    ArchiveSizeError,
+    MemberNameError,
+    MemberOverwriteError,
+    MemberTypeError,
+    ObjectCountError,
+)
 from archive_helpers.extract import (
     ExtractError,
     extract,
 )
 from archive_helpers.open import open_archive, open_tar
-from archive_helpers.exceptions import (
-    ObjectCountError,
-    MemberNameError,
-    MemberOverwriteError,
-    MemberTypeError,
-    ArchiveSizeError,
-)
 from archive_helpers.validator import validate
 
 TAR_FILES = [
@@ -500,3 +500,41 @@ def test_extract_readonly_tar_archive(archive, precheck, tmpdir):
     # Make sure the modes match the original ones
     assert dir1_perm == dir1_perm_orig
     assert file1_perm == file1_perm_orig
+
+
+@pytest.mark.parametrize(
+    ("archive", "precheck", "files"),
+    [
+        ("tests/data/zip_three_files.zip", False, ["1.txt"]),
+        ("tests/data/zip_three_files.zip", True, ["2.txt"]),
+        (
+            "tests/data/zip_folder_and_three_files.zip",
+            False,
+            ["1.txt", "3.txt"],
+        ),
+        (
+            "tests/data/zip_folder_and_three_files.zip",
+            True,
+            ["1.txt", "3.txt"],
+        ),
+        ("tests/data/tar_three_files.tar", False, ["1.txt"]),
+        ("tests/data/tar_three_files.tar", True, ["2.txt"]),
+        (
+            "tests/data/tar_folder_and_three_files.tar",
+            False,
+            ["1.txt", "3.txt"],
+        ),
+        (
+            "tests/data/tar_folder_and_three_files.tar",
+            True,
+            ["1.txt", "3.txt"],
+        ),
+    ],
+)
+def test_extract_filenames(
+    archive: str, precheck: bool, files: list[str], tmpdir: str
+) -> None:
+    """Test that extracting only specified filenames works."""
+    assert extract(archive, tmpdir, precheck=precheck, filenames=files) == len(
+        files
+    )
