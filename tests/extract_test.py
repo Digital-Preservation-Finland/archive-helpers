@@ -519,12 +519,12 @@ def test_extract_readonly_archives(archive, precheck, tmpdir):
     assert len(dst_path.join("dir1").listdir()) == 2
     assert dst_path.join("dir1/file1").check()
 
-    dir1_perm = os.stat(dst_path.join("dir1")).st_mode & 0x1ff
-    file1_perm = os.stat(dst_path.join("dir1/file1")).st_mode & 0x1ff
-    dir2_perm = os.stat(dst_path.join("dir1/dir2")).st_mode & 0x1ff
-    file2_perm = os.stat(dst_path.join("dir1/dir2/file2")).st_mode & 0x1ff
-    dir3_perm = os.stat(dst_path.join("dir1/dir2/dir3")).st_mode & 0x1ff
-    file3_perm = os.stat(dst_path.join("dir1/dir2/dir3/file3")).st_mode & 0x1ff
+    dir1_perm = os.stat(dst_path.join("dir1")).st_mode & 0o777
+    file1_perm = os.stat(dst_path.join("dir1/file1")).st_mode & 0o777
+    dir2_perm = os.stat(dst_path.join("dir1/dir2")).st_mode & 0o777
+    file2_perm = os.stat(dst_path.join("dir1/dir2/file2")).st_mode & 0o777
+    dir3_perm = os.stat(dst_path.join("dir1/dir2/dir3")).st_mode & 0o777
+    file3_perm = os.stat(dst_path.join("dir1/dir2/dir3/file3")).st_mode & 0o777
 
     assert dir1_perm == 0o755
     assert file1_perm == 0o644

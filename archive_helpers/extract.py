@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import errno
 import os
-import stat
 import tarfile
 import zipfile
 from typing import TYPE_CHECKING
@@ -154,23 +153,11 @@ def tarfile_extract(
 
     # Lastly, set permissions for the extracted content. This corresponds
     # with what zipfile extraction does.
-    permission_755 = (stat.S_IRUSR |
-                      stat.S_IWUSR |
-                      stat.S_IXUSR |
-                      stat.S_IRGRP |
-                      stat.S_IXGRP |
-                      stat.S_IROTH |
-                      stat.S_IXOTH)
-    permission_644 = (stat.S_IRUSR |
-                      stat.S_IWUSR |
-                      stat.S_IRGRP |
-                      stat.S_IROTH)
-
     for root, directories, files in os.walk(extract_path):
         for directory in directories:
-            os.chmod(os.path.join(root, directory), permission_755)
+            os.chmod(os.path.join(root, directory), 0o755)
         for file in files:
-            os.chmod(os.path.join(root, file), permission_644)
+            os.chmod(os.path.join(root, file), 0o644)
 
     return file_count
 
