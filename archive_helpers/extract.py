@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
+import stat
 import tarfile
 import zipfile
 from typing import TYPE_CHECKING
@@ -114,6 +115,8 @@ def tarfile_extract(
                 max_ratio=max_ratio,
             )
 
+            directories = []
+
             # Iterating a TarValidator yields members after validating them
             for member in validator:
                 if not (
@@ -121,15 +124,53 @@ def tarfile_extract(
                     or member.name.split("/")[-1] in filenames
                 ):
                     continue
+                set_attrs = True
+                # Do not set attributes for directories: this is
+                # done later, in case the directories are read-only.
+                if member.isdir():
+                    set_attrs = False
+                    directories.append(member)
                 try:
                     tarf.extract(
                         member,
                         path=extract_abs_path,
+                        set_attrs=set_attrs,
                         filter="fully_trusted",
                     )
                 except TypeError:  # 'filter' does not exist
-                    tarf.extract(member, path=extract_abs_path)
+                    tarf.extract(
+                        member,
+                        path=extract_abs_path,
+                        set_attrs=set_attrs
+                    )
                 file_count += 1
+
+            # Set original owner and mtime on directories. The tarfile
+            # extractall() function does this behind the scenes.
+            for member in directories:
+                member_path = os.path.join(extract_abs_path, member.name)
+                tarf.chown(member, member_path, numeric_owner=False)
+                tarf.utime(member, member_path)
+
+    # Lastly, set permissions for the extracted content. This corresponds
+    # with what zipfile extraction does.
+    permission_755 = (stat.S_IRUSR |
+                      stat.S_IWUSR |
+                      stat.S_IXUSR |
+                      stat.S_IRGRP |
+                      stat.S_IXGRP |
+                      stat.S_IROTH |
+                      stat.S_IXOTH)
+    permission_644 = (stat.S_IRUSR |
+                      stat.S_IWUSR |
+                      stat.S_IRGRP |
+                      stat.S_IROTH)
+
+    for root, directories, files in os.walk(extract_path):
+        for directory in directories:
+            os.chmod(os.path.join(root, directory), permission_755)
+        for file in files:
+            os.chmod(os.path.join(root, file), permission_644)
 
     return file_count
 

@@ -496,3 +496,39 @@ def test_extract_filenames(
     assert extract(archive, tmpdir, precheck=precheck, filenames=files) == len(
         files
     )
+
+
+@pytest.mark.parametrize(
+    ("archive", "precheck"),
+    [
+        ("tests/data/tar_dirs_readonly.tar.gz", False),
+        ("tests/data/tar_dirs_readonly.tar.gz", True),
+        ("tests/data/zip_dirs_readonly.zip", False),
+        ("tests/data/zip_dirs_readonly.zip", True),
+    ],
+)
+def test_extract_readonly_archives(archive, precheck, tmpdir):
+    """Test that read-only content in archive files can be extracted.
+    After extraction, all directories should have the permission 755
+    set, and files should have 644.
+    """
+    dst_path = tmpdir.join("destination")
+    extract(archive, str(dst_path), precheck=precheck)
+
+    assert len(dst_path.listdir()) == 1
+    assert len(dst_path.join("dir1").listdir()) == 2
+    assert dst_path.join("dir1/file1").check()
+
+    dir1_perm = os.stat(dst_path.join("dir1")).st_mode & 0x1ff
+    file1_perm = os.stat(dst_path.join("dir1/file1")).st_mode & 0x1ff
+    dir2_perm = os.stat(dst_path.join("dir1/dir2")).st_mode & 0x1ff
+    file2_perm = os.stat(dst_path.join("dir1/dir2/file2")).st_mode & 0x1ff
+    dir3_perm = os.stat(dst_path.join("dir1/dir2/dir3")).st_mode & 0x1ff
+    file3_perm = os.stat(dst_path.join("dir1/dir2/dir3/file3")).st_mode & 0x1ff
+
+    assert dir1_perm == 0o755
+    assert file1_perm == 0o644
+    assert dir2_perm == 0o755
+    assert file2_perm == 0o644
+    assert dir3_perm == 0o755
+    assert file3_perm == 0o644
