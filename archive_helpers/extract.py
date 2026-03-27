@@ -67,6 +67,10 @@ def tarfile_extract(
         if is_blank:
             raise ExtractError("Blank tar archives are not supported.")
 
+    # Gather filepaths after successful extraction. These are needed
+    # when filemode is set for the extracted contents.
+    extracted_paths = []
+
     file_count = 0
     if precheck:
         with tarfile.open(tar_path, "r|*") as tarf:
@@ -85,6 +89,11 @@ def tarfile_extract(
                     tarf.extractall(extract_path, filter="fully_trusted")
                 except TypeError:  # 'filter' does not exist
                     tarf.extractall(extract_path)
+                # All members are extracted.
+                extracted_paths = [
+                    os.path.join(extract_path, member.name)
+                    for member in valid_members
+                ]
             else:
                 members_to_extract = [
                     member
@@ -99,6 +108,11 @@ def tarfile_extract(
                     )
                 except TypeError:
                     tarf.extractall(extract_path, members=members_to_extract)
+                # Only specific members are extracted.
+                extracted_paths = [
+                    os.path.join(extract_path, member.name)
+                    for member in members_to_extract
+                ]
                 file_count = len(members_to_extract)
 
     else:
@@ -123,6 +137,7 @@ def tarfile_extract(
                     or member.name.split("/")[-1] in filenames
                 ):
                     continue
+
                 set_attrs = True
                 # Do not set attributes for directories: this is
                 # done later, in case the directories are read-only.
@@ -142,6 +157,10 @@ def tarfile_extract(
                         path=extract_abs_path,
                         set_attrs=set_attrs
                     )
+
+                member_path = os.path.join(extract_abs_path, member.name)
+                extracted_paths.append(member_path)
+
                 file_count += 1
 
             # Set original owner and mtime on directories. The tarfile
@@ -153,11 +172,16 @@ def tarfile_extract(
 
     # Lastly, set permissions for the extracted content. This corresponds
     # with what zipfile extraction does.
-    for root, directories, files in os.walk(extract_path):
-        for directory in directories:
-            os.chmod(os.path.join(root, directory), 0o755)
-        for file in files:
-            os.chmod(os.path.join(root, file), 0o644)
+    umask = os.umask(0o777)
+    os.umask(umask)
+    dir_mode = 0o777 & ~umask
+    file_mode = 0o666 & ~umask
+
+    for path in extracted_paths:
+        if os.path.isdir(path):
+            os.chmod(path, dir_mode)
+        else:
+            os.chmod(path, file_mode)
 
     return file_count
 

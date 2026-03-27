@@ -526,9 +526,13 @@ def test_extract_readonly_archives(archive, precheck, tmpdir):
     dir3_perm = os.stat(dst_path.join("dir1/dir2/dir3")).st_mode & 0o777
     file3_perm = os.stat(dst_path.join("dir1/dir2/dir3/file3")).st_mode & 0o777
 
-    assert dir1_perm == 0o755
-    assert file1_perm == 0o644
-    assert dir2_perm == 0o755
-    assert file2_perm == 0o644
-    assert dir3_perm == 0o755
-    assert file3_perm == 0o644
+    umask = os.umask(0o777)
+    os.umask(umask)
+    dir_mode = 0o777 & ~umask
+    file_mode = 0o666 & ~umask
+
+    for mode in [dir1_perm, dir2_perm, dir3_perm]:
+        assert mode == dir_mode
+
+    for mode in [file1_perm, file2_perm, file3_perm]:
+        assert mode == file_mode
