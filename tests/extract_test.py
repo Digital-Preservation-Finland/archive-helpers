@@ -49,8 +49,8 @@ def testfiles_fx(tmpdir):
     """Create test data"""
 
     tmpdir.join("source/file1").write("foo", ensure=True)
-    file1 = tmpdir.join("symlink/file1").write("foo", ensure=True)
-    tmpdir.join("symlink/link").mksymlinkto(file1)
+    tmpdir.join("symlink/file1").write("foo", ensure=True)
+    tmpdir.join("symlink/link").mksymlinkto("file1")
     tmpdir.ensure("destination", dir=True)
 
     return tmpdir.join("source.tar")
