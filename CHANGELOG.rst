@@ -11,8 +11,8 @@ Unreleased
 Changed
 ^^^^^^^
 
-- Fix read-only TAR archive extraction by setting permissions 644 and 755 for
-  files and directories respectively
+- Fix read-only TAR archive extraction by ignoring file and directory modes in
+  TAR metadata. This makes the behavior same as for ZIP archives.
 
 2.2.0 - 2026-02-25
 ------------------
